@@ -59,7 +59,7 @@ const verifyCode = async () => {
 
         await authStore.verifyOtp(payload);
         sessionStorage.removeItem('email');
-        await router.push({ name: 'Dashboard' });
+        await router.push({ name: 'Students' });
     } catch (e) {
         otpInputError.value = true;
         const emailErrors = e.response?.data?.errors?.email;

@@ -16,10 +16,6 @@ export const update = (id, payload) => {
     return AxiosService.put(`${BASE_URL}/students/${id}`, payload);
 };
 
-export const changeStatus = (id) => {
-    return AxiosService.post(`${BASE_URL}/students/${id}/change-status`);
-};
-
 export const deleteItem = (id) => {
     return AxiosService.delete(`${BASE_URL}/students/${id}/delete`);
 };

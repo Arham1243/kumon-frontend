@@ -6,7 +6,7 @@ import Logo from '@/assets/images/logo.png';
 <template>
     <div class="layout-sidebar">
         <div class="sidebar-header">
-            <router-link :to="{ name: 'Dashboard' }" class="app-logo">
+            <router-link :to="{ name: 'Students' }" class="app-logo">
                 <img
                     :src="Logo"
                     alt="Company Logo"

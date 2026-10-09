@@ -48,7 +48,7 @@ const handleSubmit = async () => {
             token: route.query.token
         };
         await authStore.setupPassword(payload);
-        await router.push({ name: 'Dashboard' });
+        await router.push({ name: 'Students' });
     } catch (e) {
         // Handle error
     } finally {

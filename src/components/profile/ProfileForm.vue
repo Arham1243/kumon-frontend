@@ -51,7 +51,7 @@ const save = async () => {
 };
 
 const goBack = () => {
-    router.push({ name: 'Dashboard' });
+    router.push({ name: 'Students' });
 };
 
 const cancel = () => {

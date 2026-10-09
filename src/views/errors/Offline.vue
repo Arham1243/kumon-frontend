@@ -7,7 +7,7 @@ const route = useRoute();
 const sessionStore = useSessionStore();
 
 const goHome = () => {
-    router.push({ name: 'Dashboard' });
+    router.push({ name: 'Students' });
 };
 
 const tryAgain = () => {

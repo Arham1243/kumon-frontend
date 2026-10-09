@@ -12,17 +12,12 @@ const moduleRoutes = Object.keys(modules)
 export default [
     {
         path: '/',
-        name: 'Home',
         component: AppLayout,
-        redirect: '/dashboard',
+        redirect: '/students',
         children: [
             {
                 path: 'dashboard',
-                name: 'Dashboard',
-                component: () => import('@/views/dashboards/Dashboard.vue'),
-                meta: {
-                    breadcrumb: [{ label: 'Home' }]
-                }
+                redirect: '/students'
             },
             {
                 path: 'profile',

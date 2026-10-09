@@ -34,17 +34,6 @@ export const useStudentStore = defineStore('StudentStore', () => {
         });
     };
 
-    const changeStatus = (id) => {
-        return globalStore.actionWrapper(async () => {
-            const res = await StudentService.changeStatus(id);
-            globalStore.showSuccess(
-                'Status updated',
-                'Student status updated successfully'
-            );
-            return res.data;
-        });
-    };
-
     const deleteItem = (id) => {
         return globalStore.actionWrapper(async () => {
             const res = await StudentService.deleteItem(id);
@@ -60,7 +49,6 @@ export const useStudentStore = defineStore('StudentStore', () => {
         search,
         create,
         update,
-        changeStatus,
         deleteItem
     };
 });

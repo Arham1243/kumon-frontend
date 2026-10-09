@@ -6,7 +6,7 @@ const router = useRouter();
 const sessionStore = useSessionStore();
 
 const goHome = () => {
-    router.push({ name: 'Dashboard' });
+    router.push({ name: 'Students' });
 };
 </script>
 

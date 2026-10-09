@@ -6,11 +6,7 @@ import { PaginationOptions, SortFilterOptions } from '@/config';
 import { truncate } from 'lodash-es';
 import { useHelpers, useTableColumnFilters } from '@/composables';
 import TableColumnFilter from '@/components/common/table-filters/TableColumnFilter.vue';
-import {
-    ROLE_STATUS_FILTER,
-    TEXT_COLUMN_FILTER
-} from '@/utils/tableFilters';
-import StatusTag from '@/components/common/StatusTag.vue';
+import { TEXT_COLUMN_FILTER } from '@/utils/tableFilters';
 import InputField from '@/components/common/InputField.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
 import Confirmation from '@/components/common/Confirmation.vue';
@@ -30,20 +26,14 @@ const busy = ref(false);
 const totalRecords = ref();
 const showDialog = ref(false);
 const deleteDialog = ref(false);
-const changeStatusDialog = ref(false);
 const formData = ref({
     student_id: '',
-    name: '',
-    status: true
+    name: ''
 });
 
 const filterColumnConfigs = [
     { field: 'student_id', filter: TEXT_COLUMN_FILTER },
-    { field: 'name', filter: TEXT_COLUMN_FILTER },
-    {
-        field: 'status',
-        filter: { ...ROLE_STATUS_FILTER, defaultActive: false }
-    }
+    { field: 'name', filter: TEXT_COLUMN_FILTER }
 ];
 
 async function getItems() {
@@ -51,9 +41,6 @@ async function getItems() {
         loading.value = true;
         const params = { ...pagination.getPageParams() };
         const payload = sortFilters.getSortFilters();
-        if (!payload.sort || payload.sort.length === 0) {
-            payload.sort = [{ field: 'status', direction: 'desc' }];
-        }
         const res = await studentStore.search(payload, params);
         items.value = res.data;
         totalRecords.value = res.meta.total;
@@ -84,12 +71,6 @@ const menuItems = computed(() => {
             permission: 'core.students.edit'
         },
         {
-            label: isItemActive.value ? 'Make Inactive' : 'Make Active',
-            icon: isItemActive.value ? 'pi pi-times' : 'pi pi-check',
-            command: () => showChangeStatusDialog(),
-            permission: 'core.students.edit'
-        },
-        {
             label: 'Delete',
             icon: 'pi pi-trash',
             command: () => showDeleteDialog(),
@@ -98,10 +79,6 @@ const menuItems = computed(() => {
     ];
 
     return helpers.filterByPermission(allMenuItems);
-});
-
-const isItemActive = computed(() => {
-    return selectedItem.value && selectedItem.value.status;
 });
 
 const openDialog = (mode = 'add') => {
@@ -121,8 +98,7 @@ const onShow = () => {
 const resetForm = () => {
     formData.value = {
         student_id: '',
-        name: '',
-        status: true
+        name: ''
     };
     globalStore.clearErrors();
 };
@@ -131,16 +107,11 @@ const editItem = () => {
     resetForm();
     formData.value.student_id = selectedItem.value.student_id;
     formData.value.name = selectedItem.value.name;
-    formData.value.status = selectedItem.value.status;
     openDialog('edit');
 };
 
 const showDeleteDialog = () => {
     deleteDialog.value = true;
-};
-
-const showChangeStatusDialog = () => {
-    changeStatusDialog.value = true;
 };
 
 const showActions = (event, item) => {
@@ -182,19 +153,6 @@ const deleteItem = async () => {
         loading.value = true;
         if (selectedItem.value) {
             await studentStore.deleteItem(selectedItem.value.uuid);
-        }
-        await getItems();
-        selectedItem.value = null;
-    } finally {
-        loading.value = false;
-    }
-};
-
-const changeStatus = async () => {
-    try {
-        loading.value = true;
-        if (selectedItem.value) {
-            await studentStore.changeStatus(selectedItem.value.uuid);
         }
         await getItems();
         selectedItem.value = null;
@@ -292,28 +250,6 @@ const changeStatus = async () => {
                 </Column>
 
                 <Column
-                    columnKey="status"
-                    header="Status"
-                    :sortable="true"
-                    field="status"
-                    :showFilterMenu="false"
-                    filterField="status"
-                >
-                    <template #filter="{ filterModel, filterCallback }">
-                        <TableColumnFilter
-                            v-model="filterModel.value"
-                            :config="ROLE_STATUS_FILTER"
-                            @apply="filterCallback()"
-                        />
-                    </template>
-                    <template #body="{ data }">
-                        <StatusTag
-                            :status="data.status ? 'active' : 'inactive'"
-                        />
-                    </template>
-                </Column>
-
-                <Column
                     columnKey="actions"
                     v-if="
                         $ability.can('core.students.edit') ||
@@ -388,21 +324,6 @@ const changeStatus = async () => {
                 :disabled="busy"
             />
         </div>
-
-        <div class="mb-3 col-span-12">
-            <label class="block mb-3">Status</label>
-            <div class="flex items-center gap-3">
-                <InputField
-                    inputId="student_status"
-                    variant="switch"
-                    v-model="formData.status"
-                    :disabled="busy"
-                />
-                <label class="cursor-pointer" for="student_status">{{
-                    formData.status ? 'Active' : 'Inactive'
-                }}</label>
-            </div>
-        </div>
     </BaseDialog>
 
     <Confirmation
@@ -412,19 +333,5 @@ const changeStatus = async () => {
         header="Delete Student"
         content="Are you sure you want to delete this student?"
         @confirm="deleteItem"
-    />
-
-    <Confirmation
-        v-if="$ability.can('core.students.edit')"
-        v-model="changeStatusDialog"
-        variant="danger"
-        :header="isItemActive ? 'Make Inactive' : 'Make Active'"
-        :content="
-            isItemActive
-                ? 'Are you sure you want to make this student inactive?'
-                : 'Are you sure you want to make this student active?'
-        "
-        :confirmButtonText="isItemActive ? 'Make Inactive' : 'Make Active'"
-        @confirm="changeStatus"
     />
 </template>

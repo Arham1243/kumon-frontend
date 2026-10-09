@@ -75,7 +75,7 @@ const submitLogin = async () => {
             return;
         }
 
-        await router.push({ name: 'Dashboard' });
+        await router.push({ name: 'Students' });
     } catch (e) {
         resetRecaptcha();
     } finally {

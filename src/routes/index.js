@@ -3,7 +3,7 @@ import routes from './routes';
 import { useSessionStore, useGlobalStore } from '@/stores';
 import { ability } from '@/plugins/ability';
 
-const DEFAULT_AUTH_ROUTE = { name: 'Dashboard' };
+const DEFAULT_AUTH_ROUTE = { name: 'Students' };
 
 const router = createRouter({
     history: createWebHistory('/'),
