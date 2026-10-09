@@ -16,6 +16,7 @@ const studentIdInput = ref('');
 const inputRef = ref(null);
 const busy = ref(false);
 const statusMessage = ref('');
+const statusTone = ref('notice');
 const statusVisible = ref(false);
 const successCheckVisible = ref(false);
 const successLabel = ref('');
@@ -25,6 +26,15 @@ let successCheckTimer = null;
 let clockTimer = null;
 
 const SUCCESS_CODES = new Set(['checked_in', 'checked_out']);
+const NOTICE_CODES = new Set([
+    'wait_before_checkout',
+    'attendance_complete'
+]);
+const ERROR_CODES = new Set([
+    'invalid_student_id',
+    'unable_to_record',
+    'rate_limited'
+]);
 const now = ref(dayjs());
 
 const formatMap = {
@@ -58,10 +68,22 @@ const STATUS_MESSAGES = {
     checked_in: 'Checked in successfully.',
     checked_out: 'Checked out successfully.',
     invalid_student_id: 'Student ID is not valid.',
-    attendance_complete: 'Attendance is already complete for today.',
+    attendance_complete: "You're already checked out for today.",
+    wait_before_checkout:
+        "You're checked in. Please wait at least one minute before checking out.",
     unable_to_record: 'Unable to record attendance. Please try again.',
     rate_limited: 'Too many attempts. Please wait a moment.'
 };
+
+function resolveStatusTone(code) {
+    if (NOTICE_CODES.has(code)) {
+        return 'notice';
+    }
+    if (ERROR_CODES.has(code)) {
+        return 'error';
+    }
+    return 'notice';
+}
 
 function showSuccessCheck(code) {
     successLabel.value =
@@ -85,6 +107,9 @@ function showStatus(code) {
     }
 
     statusMessage.value = STATUS_MESSAGES[code] ?? STATUS_MESSAGES.unable_to_record;
+    statusTone.value = resolveStatusTone(
+        STATUS_MESSAGES[code] ? code : 'unable_to_record'
+    );
     statusVisible.value = true;
     successCheckVisible.value = false;
     if (statusTimer) {
@@ -249,6 +274,8 @@ onBeforeUnmount(() => {
                         class="kiosk-page__status"
                         :class="{
                             'kiosk-page__status--visible':
+                                statusVisible && !successCheckVisible,
+                            [`kiosk-page__status--${statusTone}`]:
                                 statusVisible && !successCheckVisible
                         }"
                     >
@@ -299,7 +326,7 @@ onBeforeUnmount(() => {
 .kiosk-page__feedback {
     position: relative;
     width: 100%;
-    min-height: clamp(3.5rem, 15vw, 4.5rem);
+    min-height: clamp(4.25rem, 18vw, 5.75rem);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -404,14 +431,14 @@ onBeforeUnmount(() => {
 
 .kiosk-page__logo-img {
     width: auto;
-    max-width: min(100%, clamp(9rem, 40vw, 14rem));
-    max-height: clamp(4.5rem, 18vw, 7rem);
+    max-width: min(100%, clamp(11rem, 46vw, 17rem));
+    max-height: clamp(5.5rem, 22vw, 8.5rem);
     object-fit: contain;
     margin-bottom: clamp(0.75rem, 3vw, 1.25rem);
 }
 
 .kiosk-page__company {
-    margin: 0 0 clamp(0.5rem, 2vw, 1rem);
+    margin: 0 0 clamp(0.75rem, 3vw, 1.25rem);
     color: #4a2c7a;
     font-size: clamp(1.5rem, 6.5vw, 2.75rem);
     font-weight: 800;
@@ -466,17 +493,24 @@ onBeforeUnmount(() => {
 
 .kiosk-page__status {
     position: absolute;
-    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    margin-inline: auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0;
-    padding: 0 0.5rem;
+    margin-block: 0;
+    padding: 0 0.75rem;
+    box-sizing: border-box;
     color: #4a2c7a;
     font-size: clamp(1.0625rem, 3.5vw, 1.25rem);
     font-weight: 600;
     line-height: 1.35;
     text-align: center;
+    text-wrap: balance;
     opacity: 0;
     transition: opacity 0.35s ease;
     pointer-events: none;
@@ -484,5 +518,17 @@ onBeforeUnmount(() => {
 
 .kiosk-page__status--visible {
     opacity: 1;
+}
+
+.kiosk-page__status--notice {
+    color: #5f4f7a;
+    font-weight: 500;
+    font-size: clamp(1.125rem, 4vw, 1.375rem);
+    line-height: 1.45;
+}
+
+.kiosk-page__status--error {
+    color: #8b2d5c;
+    font-weight: 700;
 }
 </style>

@@ -4,7 +4,7 @@ import { onBeforeRouteLeave } from 'vue-router';
 import { ability } from '@/plugins/ability';
 import { COMPANY_DEFAULT_TIMEZONE, dateFormats } from '@/config/enums';
 import { timezoneSelectOptionsEnsuring } from '@/config/timezoneOptions';
-import { useGlobalStore, useSessionStore } from '@/stores';
+import { useGlobalStore } from '@/stores';
 import { useCompanyStore } from '@/modules/administration/stores';
 import { useFormDirty } from '@/composables/useFormDirty';
 import AddressFields from '@/components/common/AddressFields.vue';
@@ -31,7 +31,6 @@ function normalizeDateFormatFromApi(value) {
 }
 
 const globalStore = useGlobalStore();
-const sessionStore = useSessionStore();
 const myCompanyStore = useCompanyStore();
 const busy = ref(false);
 const loading = ref(false);
@@ -159,8 +158,7 @@ const save = async () => {
     try {
         busy.value = true;
         await myCompanyStore.saveCompany(buildCompanyPayload());
-        await sessionStore.me();
-        await getDetails({ showLoader: false });
+        window.location.reload();
     } finally {
         busy.value = false;
     }
@@ -213,54 +211,64 @@ onBeforeMount(() => {
                     <div class="pt-4 pb-2">
                         <TabPanels class="!px-0 !pb-0">
                             <TabPanel value="0">
-                                <div class="grid grid-cols-12 gap-6">
-                                    <div class="col-span-12 lg:col-span-6">
-                                        <label class="block mb-3 required"
-                                            >Name</label
-                                        >
-                                        <InputField
-                                            id="name"
-                                            v-model="formData.name"
-                                            variant="text"
-                                            class="w-full"
-                                            :disabled="formFieldDisabled"
-                                            @keyup.enter="save"
-                                        />
-                                    </div>
-
-                                    <div class="col-span-12">
-                                        <AddressFields
-                                            :form-data="formData"
-                                            :disabled="formFieldDisabled"
-                                            :required-fields="{
-                                                country: true,
-                                                state: true,
-                                                city: true,
-                                                zip: true
-                                            }"
-                                            @enter="save"
-                                        />
+                                <div
+                                    class="grid grid-cols-1 gap-x-6 gap-y-5 lg:grid-cols-12 lg:items-start"
+                                >
+                                    <div
+                                        class="flex min-w-0 flex-col gap-5 lg:col-span-8"
+                                    >
+                                        <div class="grid grid-cols-12 gap-y-5">
+                                            <div class="col-span-12">
+                                                <label
+                                                    class="block mb-3 required"
+                                                    >Name</label
+                                                >
+                                                <InputField
+                                                    id="name"
+                                                    v-model="formData.name"
+                                                    variant="text"
+                                                    class="w-full"
+                                                    :disabled="formFieldDisabled"
+                                                    @keyup.enter="save"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <AddressFields
+                                                :form-data="formData"
+                                                :disabled="formFieldDisabled"
+                                                :required-fields="{
+                                                    country: true,
+                                                    state: true,
+                                                    city: true,
+                                                    zip: true
+                                                }"
+                                                @enter="save"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div
-                                        class="col-span-12 flex justify-center mt-4"
+                                        class="flex w-full min-w-0 flex-col gap-3 lg:col-span-4"
                                     >
                                         <div
-                                            class="flex flex-col items-center gap-4"
+                                            class="panel-surface flex flex-col"
                                         >
-                                            <label
-                                                class="block font-semibold flex items-center gap-2"
+                                            <div class="mb-5 shrink-0">
+                                                <h3
+                                                    class="text-lg font-semibold text-gray-800 dark:text-gray-100"
+                                                >
+                                                    Company logo
+                                                </h3>
+                                            </div>
+                                            <p
+                                                class="mb-3 shrink-0 text-xs text-gray-500"
                                             >
-                                                Company logo
-                                                <i
-                                                    class="pi pi-info-circle text-gray-400 cursor-pointer"
-                                                    v-tooltip.top="
-                                                        'PNG, JPG, GIF, or WebP. Max 500 KB.'
-                                                    "
-                                                ></i>
-                                            </label>
+                                                PNG, JPG, GIF, or WebP. Max 500
+                                                KB.
+                                            </p>
                                             <div
-                                                class="border border-gray-300 rounded-lg shadow-sm flex items-center justify-center bg-gray-50 dark:bg-gray-800 h-40 w-40 overflow-hidden p-2"
+                                                class="flex aspect-square max-h-44 w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 p-2"
                                             >
                                                 <img
                                                     v-if="formData.logo"
@@ -272,27 +280,22 @@ onBeforeMount(() => {
                                                     v-else
                                                     :src="PlaceholderImage"
                                                     alt=""
-                                                    class="object-contain h-full w-full opacity-40"
-                                                />
-                                            </div>
-                                            <div
-                                                v-if="canEditCompany"
-                                                class="flex justify-center"
-                                            >
-                                                <FileUpload
-                                                    name="companyLogo"
-                                                    mode="basic"
-                                                    custom-upload
-                                                    auto
-                                                    choose-label="Upload"
-                                                    choose-icon="pi pi-upload"
-                                                    accept="image/png,image/jpeg,image/gif,image/webp"
-                                                    :max-file-size="512000"
-                                                    :disabled="formFieldDisabled"
-                                                    @select="onFileSelect"
+                                                    class="max-h-full max-w-full object-contain opacity-40"
                                                 />
                                             </div>
                                         </div>
+                                        <FileUpload
+                                            v-if="canEditCompany"
+                                            mode="basic"
+                                            custom-upload
+                                            auto
+                                            accept="image/png,image/jpeg,image/gif,image/webp"
+                                            :max-file-size="512000"
+                                            choose-label="Upload logo"
+                                            class="company-logo-upload w-full shrink-0"
+                                            :disabled="formFieldDisabled"
+                                            @select="onFileSelect"
+                                        />
                                     </div>
                                 </div>
                             </TabPanel>
@@ -354,3 +357,9 @@ onBeforeMount(() => {
         />
     </template>
 </template>
+
+<style scoped>
+.company-logo-upload :deep([data-pc-section='filelabel']) {
+    display: none;
+}
+</style>
