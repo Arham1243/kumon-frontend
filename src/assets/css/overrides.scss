@@ -1,0 +1,256 @@
+// Primevue overrides
+.p-paginator {
+    justify-content: flex-end!important;
+    padding: 1rem !important;
+}
+.p-datatable-header{
+    padding-inline: 0 !important;
+}
+
+/* Labels above list quick-search fields — match DataTable column header text */
+.datatable-column-header-text {
+    color: var(--p-datatable-header-cell-color, var(--p-text-color));
+    font-weight: var(--p-datatable-column-title-font-weight, 700);
+    font-size: var(--p-datatable-column-title-font-size, 1rem);
+    line-height: 1.5;
+}
+.global-breadcrumbs nav.p-breadcrumb.p-component {
+    padding: 0 !important;
+    background: transparent !important;
+}
+.p-breadcrumb-item-link {
+    white-space: nowrap;
+}
+.p-button .p-badge {
+    --p-button-badge-size: 1.27rem;
+    height: 1.22rem !important   ;
+}
+.unhighlight-row-table .p-datatable-selectable-row.p-datatable-row-selected:not(.highlight-row){
+    background: #fff !important;
+    color: #000 !important;
+}
+.highlight-disabled-checkbox.p-checkbox.p-checkbox-checked.p-disabled .p-checkbox-box {
+    color: #fff !important;
+    opacity: 0.8 !important;
+    border-color: var(--p-checkbox-checked-border-color) !important;
+    background: var(--p-checkbox-checked-background) !important;
+}
+.highlight-disabled-checkbox.p-checkbox.p-checkbox-checked.p-disabled .p-checkbox-icon {
+    color: var(--p-checkbox-icon-checked-color) !important;
+}
+.remove-datatable-header-padding .p-datatable-header {
+    padding: 0 !important;
+}
+
+// p-togglebutton
+.p-selectbutton {
+    border-radius: 100px;
+    overflow: hidden;
+}
+.p-togglebutton .p-togglebutton-content{
+    border-radius: 100px;
+    overflow: hidden;
+    padding: 0.5rem 1.75rem !important;
+    background: transparent !important;
+}
+.p-togglebutton.p-togglebutton-checked .p-togglebutton-content{
+    color: #fff !important;
+    background: var(--p-primary-color) !important;
+}
+.p-togglebutton.p-togglebutton-checked {
+    pointer-events: none;
+}
+.layout-sidebar .layout-menu-container::-webkit-scrollbar {
+    width: 8px;
+}
+.layout-sidebar .layout-menu-container::-webkit-scrollbar-thumb {
+    background:#ffffffce; 
+    border-radius: 100px;
+}
+.layout-sidebar .layout-menu-container::-webkit-scrollbar-thumb:hover {
+    background: #ffffffe7; 
+}
+th.amount-column .p-datatable-column-header-content{
+    display: flex;
+    justify-content: flex-end;
+    text-align: right;
+}
+td.amount-column{
+    text-align: right !important;
+}
+.layout-topbar .topbar-menu li.topbar-profile button {
+    border: 1px solid var(--p-primary-color);
+}
+.hide-select-all-checkbox .p-datatable-column-header-content .p-checkbox {
+    display: none;
+}
+.layout-sidebar .layout-menu li.active-menuitem > ul{
+    max-height: initial !important;
+}
+th.header-center{
+    padding: 0 0.75rem !important;
+}
+th.header-center .p-datatable-column-header-content{
+    justify-content: center;
+    gap: 0.35rem;
+}
+
+.page-header-meta {
+    color: var(--p-text-muted-color);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.35;
+}
+
+/* One scrollbar: lock page behind topbar Drawer / profile overlay */
+html.layout-topbar-scroll-lock,
+html.layout-topbar-scroll-lock body {
+    overflow: hidden !important;
+}
+
+/* Validation error state (InputField, ApiDropdown, ApiMultiselect) */
+$field-error-color: #e24c4c;
+
+.input-field-wrap--invalid {
+    .p-select,
+    .p-multiselect {
+        border-color: $field-error-color !important;
+        --p-select-border-color: #{$field-error-color};
+        --p-select-hover-border-color: #{$field-error-color};
+        --p-select-focus-border-color: #{$field-error-color};
+        --p-multiselect-border-color: #{$field-error-color};
+        --p-multiselect-hover-border-color: #{$field-error-color};
+        --p-multiselect-focus-border-color: #{$field-error-color};
+    }
+
+    .p-select-label,
+    .p-select-label.p-placeholder,
+    .p-multiselect-label,
+    .p-multiselect-label.p-placeholder {
+        color: $field-error-color !important;
+    }
+
+    .p-select-dropdown-icon,
+    .p-multiselect-dropdown-icon {
+        color: $field-error-color !important;
+    }
+}
+
+// CronLight — medium PrimeVue 4 select / listbox styling
+.cron-field .cron-light .cl-select .cl-btn {
+    background: var(--p-form-field-background, var(--p-surface-0)) !important;
+    border: 1px solid var(--p-form-field-border-color, var(--p-content-border-color)) !important;
+    color: var(--p-text-color) !important;
+    cursor: pointer !important;
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s,
+        background-color 0.2s;
+}
+
+.cron-field .cron-light .cl-select .cl-btn > span {
+    display: inline-block !important;
+    color: var(--p-text-color) !important;
+    opacity: 1 !important;
+}
+
+.cron-field .cron-light .cl-select .cl-btn:hover {
+    border-color: var(--p-form-field-hover-border-color, var(--p-primary-color)) !important;
+    background: var(--p-form-field-background, var(--p-surface-0)) !important;
+}
+
+.cron-field .cron-light .cl-select.cl-disabled .cl-btn {
+    background: var(
+        --p-form-field-disabled-background,
+        var(--p-surface-100)
+    ) !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+.cron-field .cron-light .cl-menu {
+    background: var(
+        --p-overlay-select-background,
+        var(--p-content-background)
+    ) !important;
+    color: var(--p-text-color) !important;
+    box-shadow: var(
+        --p-overlay-select-shadow,
+        0 4px 6px -1px rgb(0 0 0 / 0.1),
+        0 2px 4px -2px rgb(0 0 0 / 0.1)
+    ) !important;
+    border: 1px solid
+        var(--p-overlay-select-border-color, var(--p-content-border-color)) !important;
+    border-radius: var(--p-content-border-radius, 6px) !important;
+}
+
+.cron-field .cron-light .cl-menu * {
+    color: inherit !important;
+}
+
+.cron-field .cron-light .cl-row {
+    line-height: 1.35 !important;
+    cursor: pointer !important;
+}
+
+.cron-field .cron-light .cl-col > div {
+    padding-top: 0.375rem !important;
+    padding-bottom: 0.375rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+}
+
+.cron-field .cron-light .cl-row:hover {
+    background: transparent !important;
+}
+
+.cron-field .cron-light .cl-col:hover,
+.cron-field .cron-light .cl-col.selected,
+.cron-field .cron-light .cl-col.selected:hover,
+.cron-field .cron-light .cl-row:hover .cl-col {
+    color: var(--p-primary-color) !important;
+}
+
+.cron-field .cron-light .cl-col:hover,
+.cron-field .cron-light .cl-col.selected,
+.cron-field .cron-light .cl-col.selected:hover {
+    background: var(
+        --p-list-option-selected-background,
+        var(--p-primary-50, rgba(45, 85, 165, 0.12))
+    ) !important;
+}
+
+.cron-field .cron-light .cl-col.selected,
+.cron-field .cron-light .cl-col.selected:hover {
+    font-weight: 600;
+}
+
+html[class*='app-dark'] .cron-field .cron-light .cl-select .cl-btn {
+    background: var(--p-form-field-background, var(--p-surface-900)) !important;
+    border-color: var(
+        --p-form-field-border-color,
+        var(--p-surface-600)
+    ) !important;
+}
+
+html[class*='app-dark'] .cron-field .cron-light .cl-menu {
+    background: var(--p-overlay-select-background, var(--p-surface-900)) !important;
+    border-color: var(
+        --p-overlay-select-border-color,
+        var(--p-surface-600)
+    ) !important;
+}
+
+html[class*='app-dark'] .cron-field .cron-light .cl-col:hover,
+html[class*='app-dark'] .cron-field .cron-light .cl-col.selected,
+html[class*='app-dark'] .cron-field .cron-light .cl-col.selected:hover {
+    background: color-mix(
+        in srgb,
+        var(--p-primary-color) 18%,
+        transparent
+    ) !important;
+}
+body .p-button-success{
+    background: #047857 !important;
+    border-color: #047857 !important;
+}

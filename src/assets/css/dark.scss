@@ -1,0 +1,65 @@
+.app-dark{
+    --p-breadcrumb-item-color: #fff !important;
+    --p-button-primary-color: #fff !important;
+    --p-button-primary-hover-color: #fff !important;
+    --p-button-outlined-primary-border-color: var(--p-inputtext-border-color) !important;
+    --p-badge-primary-color: #fff !important;
+    --p-button-text-primary-color: #fff !important;
+    --p-button-danger-color: #fff !important;
+    --p-select-placeholder-color: #fff !important;
+    .p-button-outlined{
+        --p-button-outlined-primary-color: #fff !important;
+        --p-button-primary-hover-color: #fff !important;
+    }
+    .layout-primarycolor-menu{
+        --menuitem-text-color: #fff !important;
+        --menuitem-icon-color: #fff !important;
+    }
+    .layout-dark.layout-primarycolor-menu{
+        --menu-bg: var(--surface-overlay) !important;
+    }
+    .text-gray-600{
+        color: #fff !important;
+    }
+    .bg-gray-100{
+        background-color: var(--p-datatable-header-cell-background) !important;
+        color: var(--p-datatable-header-cell-color) !important;
+        border-color: var(--p-datatable-header-cell-border-color) !important;
+    }
+    .unhighlight-row-table .p-datatable-selectable-row.p-datatable-row-selected:not(.highlight-row){
+        background-color: var(--p-datatable-header-cell-background) !important;
+        color: var(--p-datatable-header-cell-color) !important;
+    }
+    .bg-custom-gray{
+        background-color: var(--p-select-background)!important;
+        border-color: var(--p-select-border-color) !important;
+        color: var(--p-select-text-color) !important;
+    }
+    .mx-input {
+        color: var(--p-select-text-color, var(--p-text-color, #e5e7eb)) !important;
+        background-color: var(
+            --p-select-background,
+            var(--p-content-background, #1f2937)
+        ) !important;
+        border: 1px solid
+            var(
+                --p-select-border-color,
+                var(--p-content-border-color, #4b5563)
+            ) !important;
+        box-shadow: none;
+    }
+    a.text-blue-600 {
+        color: #fff !important;
+        text-decoration: underline;
+        &:hover {
+            color: #fff !important;
+            text-decoration: underline;
+        }
+    }
+    .layout-topbar .topbar-menu li.topbar-profile button{
+        background: #fff;
+    }
+    body .p-button-success{
+        color: #fff !important;
+    }
+}

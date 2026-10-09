@@ -1,0 +1,16 @@
+:root[class*='app-dark'] {
+    --surface-ground: var(--p-surface-950);
+    --sidebar-shadow: none;
+    --sidebar-border: 1px solid var(--surface-border);
+    --card-shadow: none;
+    --panel-surface-bg: color-mix(
+        in srgb,
+        var(--p-surface-950, #0b1220) 78%,
+        #000 22%
+    );
+    --panel-surface-border: color-mix(
+        in srgb,
+        var(--p-content-border-color) 70%,
+        #000 30%
+    );
+}
