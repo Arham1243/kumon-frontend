@@ -239,13 +239,7 @@ const deleteItem = async () => {
                         />
                     </template>
                     <template #body="{ data }">
-                        <span
-                            v-tooltip.top="
-                                data.name?.length > 40 ? data.name : undefined
-                            "
-                        >
-                            {{ truncate(data.name, { length: 40 }) }}
-                        </span>
+                        {{ data.name }}
                     </template>
                 </Column>
 

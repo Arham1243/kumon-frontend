@@ -7,5 +7,14 @@ export default [
             breadcrumb: [{ label: 'Students' }],
             permission: 'core.students.view'
         }
+    },
+    {
+        path: 'attendance',
+        name: 'Attendance',
+        component: () => import('@/modules/core/views/attendance/index.vue'),
+        meta: {
+            breadcrumb: [{ label: 'Attendance' }],
+            permission: 'core.attendance.view'
+        }
     }
 ];

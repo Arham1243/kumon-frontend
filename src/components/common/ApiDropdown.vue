@@ -19,6 +19,11 @@ const props = defineProps({
     errorMessages: {
         type: [String, Array],
         default: undefined
+    },
+    /** When false, parent is responsible for loading options (avoids duplicate API calls). */
+    autoFetchOnMount: {
+        type: Boolean,
+        default: true
     }
 });
 
@@ -52,9 +57,10 @@ const onFilter = debounce((event) => {
 }, 300);
 
 onMounted(() => {
-    if (!localOptions.value.length) {
-        emit('search', '');
+    if (!props.autoFetchOnMount || localOptions.value.length) {
+        return;
     }
+    emit('search', '');
 });
 
 const fieldKey = computed(() => props.errorKey || props.id || '');

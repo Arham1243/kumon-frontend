@@ -29,6 +29,13 @@ export const useHelpers = () => {
         return formatMap[format] || format;
     }
 
+    function formatDate(date, format) {
+        if (date === 'Invalid date' || !date) return '-';
+
+        const datePart = resolveMomentDateFormat(format);
+        return dayjs(date).format(datePart);
+    }
+
     function formatDateTime(date, format) {
         if (date === 'Invalid date' || !date) return '-';
 
@@ -106,6 +113,7 @@ export const useHelpers = () => {
     }
 
     return {
+        formatDate,
         formatDateTime,
         formatDateTimeUtc,
         filterByPermission,

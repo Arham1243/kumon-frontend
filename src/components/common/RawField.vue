@@ -1,5 +1,6 @@
 <script setup>
 import DateField from './DateField.vue';
+import TimeField from './TimeField.vue';
 import { truncate } from 'lodash-es';
 import { useAttrs, computed } from 'vue';
 const attrs = useAttrs();
@@ -130,6 +131,12 @@ defineProps({
         v-else-if="variant == 'date'"
         v-bind="$attrs"
         :class="{ 'date-field--invalid': invalid }"
+    />
+    <TimeField
+        v-else-if="variant == 'time'"
+        v-bind="$attrs"
+        :invalid="invalid"
+        :class="{ 'time-field--invalid': invalid }"
     />
 </template>
 
