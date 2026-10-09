@@ -20,6 +20,7 @@ import {
     TEXT_COLUMN_FILTER
 } from '@/utils/tableFilters';
 import { describeCronExpression } from '@/modules/reports/utils/cronDescribe';
+import { formatTimezoneDisplay } from '@/config/timezoneOptions';
 
 const columnConfigs = [
     { field: 'name', filter: TEXT_COLUMN_FILTER },
@@ -298,6 +299,13 @@ const formatDuration = (duration) => {
                             class="mt-1 inline-block rounded bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-xs text-surface-500 dark:text-surface-400"
                             >{{ data.frequency }}</code
                         >
+                        <div
+                            v-if="data.timezone"
+                            class="text-sm text-surface-500 dark:text-surface-400 mt-1"
+                        >
+                            Schedule timezone:
+                            {{ formatTimezoneDisplay(data.timezone) }}
+                        </div>
                     </template>
                 </Column>
 

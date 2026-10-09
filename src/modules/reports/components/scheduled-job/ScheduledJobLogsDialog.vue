@@ -11,6 +11,7 @@ import { useHelpers } from '@/composables/useHelpers';
 import { describeCronExpression } from '@/modules/reports/utils/cronDescribe';
 import { isCompleteDateRange } from '@/utils/dateRangePresets';
 import { DIALOG_CLASS_WIDE } from '@/config/dialogClasses';
+import { formatTimezoneDisplay } from '@/config/timezoneOptions';
 
 const props = defineProps({
     visible: { type: Boolean, default: false },
@@ -145,6 +146,9 @@ const formatDuration = (duration) => {
                         class="ml-2 rounded bg-surface-100 dark:bg-surface-800 px-2 text-xs text-surface-500"
                         >{{ job.frequency }}</code
                     >
+                    <span v-if="job.timezone" class="ml-2">
+                        ({{ formatTimezoneDisplay(job.timezone) }})
+                    </span>
                 </div>
             </div>
 

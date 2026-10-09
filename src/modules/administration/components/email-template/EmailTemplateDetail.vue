@@ -11,14 +11,16 @@ import BaseDialog from '@/components/common/BaseDialog.vue';
 const SLUG_LOGIN_OTP = 'login-otp';
 const SLUG_RESET_PASSWORD = 'reset-password';
 const SLUG_SETUP_PASSWORD = 'setup-password';
+const SLUG_OPEN_ATTENDANCE_REMINDER = 'open-attendance-reminder';
 
 const PLACEHOLDER_YEAR = '{{year}}';
 const PLACEHOLDER_NAME = '{{name}}';
 const PLACEHOLDER_VERIFY_LINK = '{{verify_link}}';
 const PLACEHOLDER_EXPIRES_IN_MINUTES = '{{expires_in_minutes}}';
+const PLACEHOLDER_ATTENDANCE_TABLE = '{{attendance_table}}';
 
 /** Must match {@see App\Models\Admin\AdminEmailTemplate::DEFAULT_COPYRIGHT_LINE} */
-const DEFAULT_COPYRIGHT_LINE = '© {{year}} AdaptiveQMS. All rights reserved.';
+const DEFAULT_COPYRIGHT_LINE = '© {{year}} Kumon. All rights reserved.';
 
 const route = useRoute();
 const router = useRouter();
@@ -67,7 +69,7 @@ function resizePreviewFrame() {
 }
 
 /** Shown in From helper; outbound mail uses tenant/system Mailgun domain. */
-const MAIL_DOMAIN_DISPLAY = 'mail.adaptiveqms.com';
+const MAIL_DOMAIN_DISPLAY = 'mail.servicore.io';
 
 const fromDeliveryAddress = computed(() => {
     const local = (formData.value.from || 'info').trim() || 'info';
@@ -99,6 +101,10 @@ const sendTestFormData = ref({ recipient_email: '' });
 const sendTestBusy = ref(false);
 let nextRoute = null;
 
+const usesBodyHtmlEditor = computed(
+    () => templateSlug.value === SLUG_OPEN_ATTENDANCE_REMINDER
+);
+
 const supportedVariables = computed(() => {
     const slug = templateSlug.value;
     let greeting = [];
@@ -109,6 +115,9 @@ const supportedVariables = computed(() => {
     } else if (slug === SLUG_RESET_PASSWORD || slug === SLUG_SETUP_PASSWORD) {
         greeting = [PLACEHOLDER_NAME];
         body = [PLACEHOLDER_VERIFY_LINK];
+    } else if (slug === SLUG_OPEN_ATTENDANCE_REMINDER) {
+        greeting = [PLACEHOLDER_NAME];
+        body = [PLACEHOLDER_ATTENDANCE_TABLE];
     }
     return {
         greeting,
@@ -195,6 +204,9 @@ function previewPayload() {
         subject_template: formData.value.subject_template,
         intro_html: formData.value.intro_html
     };
+    if (usesBodyHtmlEditor.value) {
+        payload.body_html = formData.value.body_html;
+    }
     return payload;
 }
 
@@ -271,6 +283,9 @@ const savePayload = computed(() => {
         name: formData.value.name,
         intro_html: formData.value.intro_html
     };
+    if (usesBodyHtmlEditor.value) {
+        p.body_html = formData.value.body_html;
+    }
     p.status = formData.value.status;
     return p;
 });
@@ -520,7 +535,11 @@ async function save() {
                                     <label
                                         class="block mb-3"
                                         for="intro_html_editor"
-                                        >Body</label
+                                        >{{
+                                            usesBodyHtmlEditor
+                                                ? 'Greeting'
+                                                : 'Body'
+                                        }}</label
                                     >
                                     <BoldOnlyQuillEditor
                                         id="intro_html_editor"
@@ -544,6 +563,54 @@ async function save() {
                                         <span
                                             v-for="v in supportedVariables.greeting"
                                             :key="'g-' + v"
+                                            v-tooltip.top="`Click to copy`"
+                                            class="flex items-center bg-blue-50 text-blue-800 text-sm font-medium px-3 py-1 rounded-full shadow-sm cursor-pointer transition hover:bg-blue-100"
+                                            @click="copyToClipboard(v)"
+                                        >
+                                            {{ v }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    v-if="usesBodyHtmlEditor"
+                                    class="col-span-12"
+                                >
+                                    <label
+                                        class="block mb-3"
+                                        for="body_html_editor"
+                                        >Body</label
+                                    >
+                                    <BoldOnlyQuillEditor
+                                        id="body_html_editor"
+                                        v-model="formData.body_html"
+                                        :disabled="busy"
+                                        preserve-html
+                                        min-height="220px"
+                                        @update:model-value="debouncedPreview"
+                                    />
+                                    <p
+                                        class="mt-2 text-sm text-surface-600 dark:text-surface-400"
+                                    >
+                                        Include
+                                        <code
+                                            class="rounded bg-surface-100 dark:bg-surface-800 px-1"
+                                            >{{ PLACEHOLDER_ATTENDANCE_TABLE }}</code
+                                        >
+                                        where the student list should appear.
+                                    </p>
+                                    <div
+                                        v-if="supportedVariables.body.length"
+                                        class="mt-2 flex flex-wrap gap-2 items-center"
+                                    >
+                                        <span
+                                            class="text-gray-600 text-sm font-medium"
+                                        >
+                                            Supported Variables:
+                                        </span>
+                                        <span
+                                            v-for="v in supportedVariables.body"
+                                            :key="'b-' + v"
                                             v-tooltip.top="`Click to copy`"
                                             class="flex items-center bg-blue-50 text-blue-800 text-sm font-medium px-3 py-1 rounded-full shadow-sm cursor-pointer transition hover:bg-blue-100"
                                             @click="copyToClipboard(v)"

@@ -30,18 +30,18 @@ export const useSessionStore = defineStore('SessionStore', () => {
     };
 
     const clearSessionState = () => {
-        cookies.remove('adaptiveqms_admin_cookie', null);
+        cookies.remove('kumon_admin_cookie', null);
         sessionStorage.removeItem('email');
         user.value = null;
         myCompany.value = null;
     };
 
     const setCookie = (value) => {
-        cookies.set('adaptiveqms_admin_cookie', value, '7d');
+        cookies.set('kumon_admin_cookie', value, '7d');
     };
 
     const getCookie = () => {
-        return cookies.get('adaptiveqms_admin_cookie');
+        return cookies.get('kumon_admin_cookie');
     };
 
     const setEmail = (value) => {

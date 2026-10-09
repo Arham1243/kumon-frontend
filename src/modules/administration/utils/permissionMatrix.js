@@ -142,7 +142,11 @@ export const PERMISSION_MATRIX_SECTIONS = mergedManifests.matrixSections.map(
     (section) => ({
         title: section.title ?? null,
         entities: section.entities,
-        childIndent: section.childIndent ?? false
+        childIndent: section.childIndent ?? false,
+        presetKey:
+            section.presetKey ??
+            mergedManifests.sectionPresetKeys[section.title ?? ''] ??
+            null
     })
 );
 
@@ -158,6 +162,10 @@ function entitiesForPreset(presetKey) {
 
 export function isReportsSectionEntity(entity) {
     return entitiesForPreset('reports').has(entity);
+}
+
+export function isEntityInPresetSection(presetKey, entity) {
+    return entitiesForPreset(presetKey).has(entity);
 }
 
 function capitalizeWords(str) {
@@ -324,7 +332,9 @@ export function buildPermissionMatrixRows(
                 isGroupHeader: true,
                 groupTitle: section.title,
                 presetSectionKey:
-                    SECTION_HEADER_PRESET_KEYS[section.title] ?? null
+                    section.presetKey ??
+                    SECTION_HEADER_PRESET_KEYS[section.title] ??
+                    null
             });
         }
         for (const entity of section.entities) {

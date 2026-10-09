@@ -1,3 +1,6 @@
+/** IANA default for company home timezone (matches DB default on admin_companies.timezone). */
+export const COMPANY_DEFAULT_TIMEZONE = 'America/New_York';
+
 export const dateFormats = [
     { name: 'MM/DD/YYYY', code: 'mm/dd/yy' },
     { name: 'DD/MM/YYYY', code: 'dd/mm/yy' },

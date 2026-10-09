@@ -15,13 +15,14 @@ router.beforeEach(async (to, from, next) => {
     const { access_token: accessToken } = sessionStore.getCookie() || {};
 
     const isAuth = to.path.startsWith('/auth');
+    const isPublicRoute = to.meta.public === true;
     const isOfflineRoute = to.name === 'Offline';
 
-    if (!navigator.onLine && !isOfflineRoute) {
+    if (!navigator.onLine && !isOfflineRoute && !isPublicRoute) {
         return next({ name: 'Offline', query: { redirect: to.fullPath } });
     }
 
-    if (isOfflineRoute) {
+    if (isOfflineRoute || isPublicRoute) {
         return next();
     }
 

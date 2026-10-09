@@ -12,6 +12,7 @@ import {
     applyPermissionDependencies,
     isApplicableAction,
     isReportsSectionEntity,
+    isEntityInPresetSection,
     ENTITY_HIDDEN_MATRIX_ACTIONS
 } from '@/modules/administration/utils/permissionMatrix';
 import PermissionMatrixTable from '@/modules/administration/components/permission/PermissionMatrixTable.vue';
@@ -27,15 +28,25 @@ const GLOBAL_PRESET = {
 const PRESET_SECTIONS = [
     GLOBAL_PRESET,
     {
+        key: 'core',
+        filter: (entity) => isEntityInPresetSection('core', entity)
+    },
+    {
         key: 'reports',
         filter: isReportsSectionEntity
+    },
+    {
+        key: 'administration',
+        filter: (entity) => isEntityInPresetSection('administration', entity)
     }
 ];
 
 function emptySectionPresets() {
     return {
         global: { viewOnly: false, fullAdmin: false },
-        reports: { viewOnly: false, fullAdmin: false }
+        core: { viewOnly: false, fullAdmin: false },
+        reports: { viewOnly: false, fullAdmin: false },
+        administration: { viewOnly: false, fullAdmin: false }
     };
 }
 

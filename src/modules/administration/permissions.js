@@ -20,6 +20,7 @@ export const matrixSections = [
             'administration.email-templates'
         ],
         childIndent: true,
-        order: 40
+        order: 40,
+        presetKey: 'administration'
     }
 ];

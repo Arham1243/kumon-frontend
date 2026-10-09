@@ -2,9 +2,9 @@
 import { computed, onBeforeMount, ref } from 'vue';
 import { onBeforeRouteLeave } from 'vue-router';
 import { ability } from '@/plugins/ability';
-import { dateFormats } from '@/config/enums';
+import { COMPANY_DEFAULT_TIMEZONE, dateFormats } from '@/config/enums';
 import { timezoneSelectOptionsEnsuring } from '@/config/timezoneOptions';
-import { useGlobalStore } from '@/stores';
+import { useGlobalStore, useSessionStore } from '@/stores';
 import { useCompanyStore } from '@/modules/administration/stores';
 import { useFormDirty } from '@/composables/useFormDirty';
 import AddressFields from '@/components/common/AddressFields.vue';
@@ -31,12 +31,12 @@ function normalizeDateFormatFromApi(value) {
 }
 
 const globalStore = useGlobalStore();
+const sessionStore = useSessionStore();
 const myCompanyStore = useCompanyStore();
 const busy = ref(false);
 const loading = ref(false);
 const showUnsavedDialog = ref(false);
 const activeCompanyTab = ref('0');
-
 const formData = ref({
     name: '',
     street_address_1: '',
@@ -46,7 +46,7 @@ const formData = ref({
     state: '',
     zip: '',
     country: '',
-    timezone: 'America/New_York',
+    timezone: COMPANY_DEFAULT_TIMEZONE,
     date_format: 'mm/dd/yy',
     logo: null
 });
@@ -119,29 +119,38 @@ async function confirmDiscard() {
     }
 }
 
-const getDetails = async () => {
+function applyCompanyResponse(res) {
+    if (!res) {
+        return;
+    }
+    formData.value = {
+        ...formData.value,
+        name: res.name ?? '',
+        street_address_1: res.street_address_1 ?? '',
+        street_address_2: res.street_address_2 ?? '',
+        street_address_3: res.street_address_3 ?? '',
+        city: res.city ?? '',
+        state: res.state ?? '',
+        zip: res.zip ?? '',
+        country: res.country ?? '',
+        timezone: res.timezone || COMPANY_DEFAULT_TIMEZONE,
+        date_format: normalizeDateFormatFromApi(res.date_format),
+        logo: res.logo_url || res.logo || null
+    };
+    resetDirty(formData.value);
+}
+
+const getDetails = async ({ showLoader = true } = {}) => {
     try {
-        loading.value = true;
-        const res = await myCompanyStore.getMyCompany();
-        if (res) {
-            formData.value = {
-                ...formData.value,
-                name: res.name ?? '',
-                street_address_1: res.street_address_1 ?? '',
-                street_address_2: res.street_address_2 ?? '',
-                street_address_3: res.street_address_3 ?? '',
-                city: res.city ?? '',
-                state: res.state ?? '',
-                zip: res.zip ?? '',
-                country: res.country ?? '',
-                timezone: res.timezone || 'America/New_York',
-                date_format: normalizeDateFormatFromApi(res.date_format),
-                logo: res.logo_url || res.logo || null
-            };
-            resetDirty(formData.value);
+        if (showLoader) {
+            loading.value = true;
         }
+        const res = await myCompanyStore.getMyCompany();
+        applyCompanyResponse(res);
     } finally {
-        loading.value = false;
+        if (showLoader) {
+            loading.value = false;
+        }
         globalStore.clearErrors();
     }
 };
@@ -150,7 +159,8 @@ const save = async () => {
     try {
         busy.value = true;
         await myCompanyStore.saveCompany(buildCompanyPayload());
-        window.location.reload();
+        await sessionStore.me();
+        await getDetails({ showLoader: false });
     } finally {
         busy.value = false;
     }
@@ -200,36 +210,25 @@ onBeforeMount(() => {
                         <Tab value="0">Information</Tab>
                         <Tab value="1">Settings</Tab>
                     </TabList>
-                    <div class="py-4">
-                        <TabPanels class="!px-0">
+                    <div class="pt-4 pb-2">
+                        <TabPanels class="!px-0 !pb-0">
                             <TabPanel value="0">
-                                <div
-                                    class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-10"
-                                >
-                                    <div class="space-y-6 lg:col-span-9">
-                                        <div
-                                            class="grid grid-cols-12 gap-x-6 gap-y-5"
+                                <div class="grid grid-cols-12 gap-6">
+                                    <div class="col-span-12 lg:col-span-6">
+                                        <label class="block mb-3 required"
+                                            >Name</label
                                         >
-                                            <div
-                                                class="col-span-12 md:col-span-6"
-                                            >
-                                                <label
-                                                    class="block mb-3 required"
-                                                    >Name</label
-                                                >
-                                                <InputField
-                                                    id="name"
-                                                    v-model="formData.name"
-                                                    variant="text"
-                                                    class="w-full"
-                                                    :disabled="
-                                                        formFieldDisabled
-                                                    "
-                                                    @keyup.enter="save"
-                                                />
-                                            </div>
-                                        </div>
+                                        <InputField
+                                            id="name"
+                                            v-model="formData.name"
+                                            variant="text"
+                                            class="w-full"
+                                            :disabled="formFieldDisabled"
+                                            @keyup.enter="save"
+                                        />
+                                    </div>
 
+                                    <div class="col-span-12">
                                         <AddressFields
                                             :form-data="formData"
                                             :disabled="formFieldDisabled"
@@ -243,52 +242,63 @@ onBeforeMount(() => {
                                         />
                                     </div>
 
-                                    <aside class="min-w-0 lg:col-span-3">
+                                    <div
+                                        class="col-span-12 flex justify-center mt-4"
+                                    >
                                         <div
-                                            class="panel-surface lg:sticky lg:top-4"
+                                            class="flex flex-col items-center gap-4"
                                         >
                                             <label
-                                                class="mb-3 block text-base font-semibold"
-                                                >Company logo</label
+                                                class="block font-semibold flex items-center gap-2"
                                             >
-                                            <p
-                                                class="mb-3 text-xs text-gray-500"
-                                            >
-                                                PNG, JPG, GIF, or WebP. Max 500
-                                                KB.
-                                            </p>
+                                                Company logo
+                                                <i
+                                                    class="pi pi-info-circle text-gray-400 cursor-pointer"
+                                                    v-tooltip.top="
+                                                        'PNG, JPG, GIF, or WebP. Max 500 KB.'
+                                                    "
+                                                ></i>
+                                            </label>
                                             <div
-                                                class="relative aspect-square w-full overflow-hidden rounded-xl border-2 border-dashed border-gray-200 p-3"
+                                                class="border border-gray-300 rounded-lg shadow-sm flex items-center justify-center bg-gray-50 dark:bg-gray-800 h-40 w-40 overflow-hidden p-2"
                                             >
                                                 <img
                                                     v-if="formData.logo"
                                                     :src="formData.logo"
                                                     alt="Company logo"
-                                                    class="h-full w-full object-contain"
+                                                    class="max-h-full max-w-full object-contain"
                                                 />
                                                 <img
                                                     v-else
                                                     :src="PlaceholderImage"
                                                     alt=""
-                                                    class="h-full w-full object-contain opacity-40"
+                                                    class="object-contain h-full w-full opacity-40"
                                                 />
                                             </div>
-                                            <FileUpload
+                                            <div
                                                 v-if="canEditCompany"
-                                                mode="basic"
-                                                accept="image/png,image/jpeg,image/gif,image/webp"
-                                                :max-file-size="512000"
-                                                choose-label="Upload logo"
-                                                class="mt-3 w-full"
-                                                :disabled="formFieldDisabled"
-                                                @select="onFileSelect"
-                                            />
+                                                class="flex justify-center"
+                                            >
+                                                <FileUpload
+                                                    name="companyLogo"
+                                                    mode="basic"
+                                                    custom-upload
+                                                    auto
+                                                    choose-label="Upload"
+                                                    choose-icon="pi pi-upload"
+                                                    accept="image/png,image/jpeg,image/gif,image/webp"
+                                                    :max-file-size="512000"
+                                                    :disabled="formFieldDisabled"
+                                                    @select="onFileSelect"
+                                                />
+                                            </div>
                                         </div>
-                                    </aside>
+                                    </div>
                                 </div>
                             </TabPanel>
                             <TabPanel value="1">
                                 <div class="grid grid-cols-12 gap-6">
+                                    <!-- Home timezone hidden for now
                                     <div class="col-span-12 md:col-span-4">
                                         <label class="block mb-3"
                                             >Home timezone</label
@@ -308,6 +318,7 @@ onBeforeMount(() => {
                                             filter-placeholder="Search timezone"
                                         />
                                     </div>
+                                    -->
                                     <div class="col-span-12 md:col-span-4">
                                         <label class="block mb-3"
                                             >Date format</label
@@ -334,11 +345,11 @@ onBeforeMount(() => {
 
         <Confirmation
             v-model="showUnsavedDialog"
-            header="Unsaved changes"
-            content="You have unsaved changes. Discard them?"
-            confirm-button-text="Discard"
-            cancel-button-text="Keep editing"
-            variant="warning"
+            header="Unsaved Changes"
+            content="You have unsaved changes. If you continue, those changes will be lost. Do you want to discard them?"
+            confirm-button-text="Discard Changes"
+            cancel-button-text="Keep Editing"
+            variant="danger"
             @confirm="confirmDiscard"
         />
     </template>

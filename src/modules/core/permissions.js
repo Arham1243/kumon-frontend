@@ -10,6 +10,7 @@ export const matrixSections = [
         title: 'Core',
         entities: ['core.students', 'core.attendance'],
         childIndent: false,
-        order: 10
+        order: 10,
+        presetKey: 'core'
     }
 ];

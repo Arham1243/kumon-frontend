@@ -34,7 +34,10 @@ async function getItems() {
             ...sortFilters.getSortFilters()
         };
         if (!payload.sort || payload.sort.length === 0) {
-            payload.sort = [{ field: 'name', direction: 'asc' }];
+            payload.sort = [
+                { field: 'system', direction: 'desc' },
+                { field: 'name', direction: 'asc' }
+            ];
         }
         const res = await roleStore.search(payload, params);
         items.value = res.data;
@@ -368,19 +371,17 @@ const changeStatus = async () => {
                     class="flex justify-end"
                 >
                     <template #body="{ data }">
-                        <div class="flex items-center justify-end gap-8 pr-3">
+                        <div
+                            class="ml-auto flex min-w-[7.25rem] items-center justify-center pr-3"
+                        >
                             <i
                                 v-if="data.system"
-                                class="pi pi-lock text-red-500 !text-xl opacity-90 shrink-0 mr-2"
+                                class="pi pi-lock text-red-500 !text-xl opacity-90 shrink-0"
                                 aria-hidden="true"
                                 v-tooltip.top="SYSTEM_MANAGED_LOCK_TOOLTIP"
                             />
-                            <span
-                                v-else
-                                class="inline-block w-8 shrink-0"
-                                aria-hidden="true"
-                            />
                             <Button
+                                v-else
                                 class="!px-3 !py-2"
                                 label="Actions"
                                 variant="outlined"

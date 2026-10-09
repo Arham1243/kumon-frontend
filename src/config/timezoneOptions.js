@@ -20,6 +20,43 @@ export const PREFERRED_TIMEZONE_BY_COUNTRY_NAME = {
     'Saudi Arabia': 'Asia/Riyadh'
 };
 
+/**
+ * Human-friendly label for display (e.g. "EST Timezone"), not the raw IANA id.
+ */
+export function formatTimezoneDisplay(iana) {
+    const code = typeof iana === 'string' ? iana.trim() : '';
+    if (!code) {
+        return '';
+    }
+    try {
+        const d = new Date();
+        const shortParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: code,
+            timeZoneName: 'short'
+        }).formatToParts(d);
+        const abbr = shortParts
+            .find((p) => p.type === 'timeZoneName')
+            ?.value?.trim();
+        if (abbr) {
+            return `${abbr} Timezone`;
+        }
+
+        const longParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: code,
+            timeZoneName: 'longGeneric'
+        }).formatToParts(d);
+        const longName = longParts
+            .find((p) => p.type === 'timeZoneName')
+            ?.value?.trim();
+        if (longName) {
+            return longName;
+        }
+    } catch {
+        /* fall through */
+    }
+    return code.replace(/_/g, ' ');
+}
+
 export function formatTimezoneOptionLabel(iana) {
     try {
         const d = new Date();

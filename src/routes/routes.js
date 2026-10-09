@@ -31,6 +31,20 @@ export default [
         ]
     },
     {
+        path: '/kiosk/:companyUuid',
+        redirect: (to) => ({
+            path: `/attendance/${to.params.companyUuid}`
+        })
+    },
+    {
+        path: '/attendance/:companyUuid',
+        name: 'StudentAttendance',
+        component: () => import('@/views/kiosk/AttendanceKiosk.vue'),
+        meta: {
+            public: true
+        }
+    },
+    {
         path: '/auth',
         component: AuthLayout,
         children: [

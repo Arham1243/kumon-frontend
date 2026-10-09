@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeMount, ref, watch } from 'vue';
 import { useAttendanceStore } from '@/modules/core/stores';
-import { useGlobalStore } from '@/stores';
+import { useGlobalStore, useSessionStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
 import { useHelpers, useTableColumnFilters } from '@/composables';
 import TableColumnFilter from '@/components/common/table-filters/TableColumnFilter.vue';
@@ -31,6 +31,21 @@ function disableFutureAttendanceDate(date) {
 }
 const attendanceStore = useAttendanceStore();
 const globalStore = useGlobalStore();
+const sessionStore = useSessionStore();
+
+const kioskUrl = computed(() => {
+    const uuid = sessionStore.myCompany?.uuid;
+    if (!uuid) {
+        return null;
+    }
+    return `${window.location.origin}/attendance/${uuid}`;
+});
+
+function openKiosk() {
+    if (kioskUrl.value) {
+        window.open(kioskUrl.value, '_blank', 'noopener,noreferrer');
+    }
+}
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions();
@@ -292,7 +307,7 @@ const deleteItem = async () => {
                     class="block text-sm mb-1 text-surface-700 dark:text-surface-200"
                     for="attendance_student_filter"
                 >
-                   Filter by Students
+                   Filter by Student
                 </label>
                 <ApiDropdown
                     filter
@@ -310,6 +325,14 @@ const deleteItem = async () => {
                     :disabled="loadingStudents"
                 />
             </div>
+            <Button
+                v-if="kioskUrl"
+                label="Student Attendance"
+                icon="pi pi-external-link"
+                severity="success"
+                class="shrink-0"
+                @click="openKiosk"
+            />
             <Button
                 v-if="$ability.can('core.attendance.create')"
                 label="Add New"
