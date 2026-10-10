@@ -2,7 +2,13 @@
 import { computed, nextTick, onBeforeMount, onBeforeUnmount, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import dayjs from '@/plugins/dayjs';
-import { fetchKioskCompany, punch } from '@/modules/core/services/Kiosk.service';
+import {
+    fetchKioskCompany,
+    isKioskCompanyUuid,
+    parseKioskCompanyResponse,
+    parseKioskPunchResponse,
+    punch
+} from '@/modules/core/services/Kiosk.service';
 import Loader from '@/components/common/Loader.vue';
 
 const route = useRoute();
@@ -10,7 +16,7 @@ const route = useRoute();
 const companyUuid = computed(() => String(route.params.companyUuid ?? ''));
 
 const loading = ref(true);
-const notFound = ref(false);
+const loadFailure = ref(null);
 const company = ref(null);
 const studentIdInput = ref('');
 const inputRef = ref(null);
@@ -127,20 +133,30 @@ async function focusInput() {
 
 async function loadCompany() {
     loading.value = true;
-    notFound.value = false;
+    loadFailure.value = null;
+    company.value = null;
+
+    if (!isKioskCompanyUuid(companyUuid.value)) {
+        loadFailure.value = 'not_found';
+        loading.value = false;
+        return;
+    }
+
     try {
         const res = await fetchKioskCompany(companyUuid.value);
-        company.value = res.data?.data ?? res.data;
+        company.value = parseKioskCompanyResponse(res);
     } catch (err) {
         if (err.response?.status === 404) {
-            notFound.value = true;
+            loadFailure.value = 'not_found';
         } else {
-            notFound.value = true;
+            loadFailure.value = 'error';
         }
         company.value = null;
     } finally {
         loading.value = false;
-        await focusInput();
+        if (!loadFailure.value) {
+            await focusInput();
+        }
     }
 }
 
@@ -149,20 +165,25 @@ async function submitPunch() {
     studentIdInput.value = '';
     await focusInput();
 
-    if (!code || busy.value || notFound.value) {
+    if (!code || busy.value || loadFailure.value || !company.value) {
         return;
     }
 
     busy.value = true;
     try {
         const res = await punch(companyUuid.value, code);
-        const codeResult = res.data?.code;
-        if (codeResult) {
-            showStatus(codeResult);
-        } else {
-            showStatus('unable_to_record');
-        }
+        showStatus(parseKioskPunchResponse(res));
     } catch (err) {
+        if (err.code === 'kiosk_bad_response') {
+            loadFailure.value = 'error';
+            company.value = null;
+            return;
+        }
+        if (err.response?.status === 404) {
+            loadFailure.value = 'not_found';
+            company.value = null;
+            return;
+        }
         if (err.response?.status === 429) {
             showStatus('rate_limited');
         } else if (err.response?.status === 422) {
@@ -208,10 +229,19 @@ onBeforeUnmount(() => {
         <div v-if="loading" class="kiosk-page__loader kiosk-page__message--centered">
             <Loader compact />
         </div>
-        <div v-else-if="notFound" class="kiosk-page__message kiosk-page__message--centered">
+        <div
+            v-else-if="loadFailure === 'not_found'"
+            class="kiosk-page__message kiosk-page__message--centered"
+        >
             This page is not available.
         </div>
-        <template v-else>
+        <div
+            v-else-if="loadFailure === 'error'"
+            class="kiosk-page__message kiosk-page__message--centered"
+        >
+            Something went wrong.
+        </div>
+        <template v-else-if="company">
             <div class="kiosk-page__above">
                 <img
                     v-if="company?.logo"
@@ -284,6 +314,12 @@ onBeforeUnmount(() => {
                 </div>
             </div>
         </template>
+        <div
+            v-else
+            class="kiosk-page__message kiosk-page__message--centered"
+        >
+            Something went wrong.
+        </div>
     </div>
 </template>
 
