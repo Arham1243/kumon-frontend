@@ -55,6 +55,7 @@ jobs:
               env:
                   SELECTED_BRANCH: ${{ github.event.inputs.branch }}
               run: |
+                  self_hosted=false
                   case "$SELECTED_BRANCH" in
                     main)
                       environment=main
