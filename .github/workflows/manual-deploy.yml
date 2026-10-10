@@ -45,7 +45,6 @@ jobs:
             branch: ${{ steps.map.outputs.branch }}
             environment: ${{ steps.map.outputs.environment }}
             api_base_url: ${{ steps.map.outputs.api_base_url }}
-            app_url: ${{ steps.map.outputs.app_url }}
             ftp_server_secret: ${{ steps.map.outputs.ftp_server_secret }}
             ftp_username_secret: ${{ steps.map.outputs.ftp_username_secret }}
             ftp_password_secret: ${{ steps.map.outputs.ftp_password_secret }}
@@ -60,7 +59,6 @@ jobs:
                     main)
                       environment=main
                       api_base_url=https://kumon.servicore.io/backend
-                      app_url=https://kumon.servicore.io
                       ftp_server_secret=FTP_SERVER_MAIN
                       ftp_username_secret=FTP_USERNAME_MAIN
                       ftp_password_secret=FTP_PASSWORD_MAIN
@@ -71,7 +69,6 @@ jobs:
                     echo "branch=$SELECTED_BRANCH"
                     echo "environment=$environment"
                     echo "api_base_url=$api_base_url"
-                    echo "app_url=$app_url"
                     echo "ftp_server_secret=$ftp_server_secret"
                     echo "ftp_username_secret=$ftp_username_secret"
                     echo "ftp_password_secret=$ftp_password_secret"
@@ -97,7 +94,13 @@ jobs:
                   npm run build
               env:
                   VITE_API_BASE_URL: ${{ needs.resolve.outputs.api_base_url }}
-                  VITE_APP_URL: ${{ needs.resolve.outputs.app_url }}
+
+            - name: Verify API base URL is baked into the production bundle
+              run: |
+                  if ! grep -rq 'kumon.servicore.io/backend' dist/assets/; then
+                    echo "::error::Production build is missing VITE_API_BASE_URL (expected https://kumon.servicore.io/backend in dist/assets)."
+                    exit 1
+                  fi
 
             - name: Sync build to ${{ needs.resolve.outputs.environment }}
               uses: SamKirkland/FTP-Deploy-Action@v4.3.6
