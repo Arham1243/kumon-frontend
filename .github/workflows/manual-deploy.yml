@@ -92,7 +92,7 @@ jobs:
                   VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
             - name: Sync build to ${{ needs.resolve.outputs.environment }}
-              uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+              uses: SamKirkland/FTP-Deploy-Action@v4.4.0
               with:
                   server: ${{ secrets[needs.resolve.outputs.ftp_server_secret] }}
                   username: ${{ secrets[needs.resolve.outputs.ftp_username_secret] }}
@@ -101,6 +101,7 @@ jobs:
                   port: 21
                   security: loose
                   log-level: verbose
+                  state-name: kumon-frontend-ftp-${{ needs.resolve.outputs.environment }}
                   timeout: 600000
                   local-dir: ./dist/
                   server-dir: /
