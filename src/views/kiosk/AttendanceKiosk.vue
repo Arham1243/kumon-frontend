@@ -26,6 +26,7 @@ const statusTone = ref('notice');
 const statusVisible = ref(false);
 const successCheckVisible = ref(false);
 const successLabel = ref('');
+const successStudentName = ref('');
 const successFlashKey = ref(0);
 let statusTimer = null;
 let successCheckTimer = null;
@@ -91,7 +92,8 @@ function resolveStatusTone(code) {
     return 'notice';
 }
 
-function showSuccessCheck(code) {
+function showSuccessCheck(code, studentName) {
+    successStudentName.value = String(studentName ?? '').trim();
     successLabel.value =
         code === 'checked_out' ? 'Checked out' : 'Checked in';
     successFlashKey.value += 1;
@@ -105,12 +107,14 @@ function showSuccessCheck(code) {
     }, 2000);
 }
 
-function showStatus(code) {
+function showStatus(code, studentName = '') {
     if (SUCCESS_CODES.has(code)) {
         statusVisible.value = false;
-        showSuccessCheck(code);
+        showSuccessCheck(code, studentName);
         return;
     }
+
+    successStudentName.value = '';
 
     statusMessage.value = STATUS_MESSAGES[code] ?? STATUS_MESSAGES.unable_to_record;
     statusTone.value = resolveStatusTone(
@@ -172,7 +176,8 @@ async function submitPunch() {
     busy.value = true;
     try {
         const res = await punch(companyUuid.value, code);
-        showStatus(parseKioskPunchResponse(res));
+        const result = parseKioskPunchResponse(res);
+        showStatus(result.code, result.studentName);
     } catch (err) {
         if (err.code === 'kiosk_bad_response') {
             loadFailure.value = 'error';
@@ -201,6 +206,38 @@ function onKeydown(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
         submitPunch();
+        return;
+    }
+
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+    }
+
+    const allowedControlKeys = new Set([
+        'Backspace',
+        'Delete',
+        'Tab',
+        'ArrowLeft',
+        'ArrowRight',
+        'ArrowUp',
+        'ArrowDown',
+        'Home',
+        'End'
+    ]);
+
+    if (allowedControlKeys.has(event.key)) {
+        return;
+    }
+
+    if (event.key.length === 1 && !/^\d$/.test(event.key)) {
+        event.preventDefault();
+    }
+}
+
+function onStudentIdInput(event) {
+    const digits = event.target.value.replace(/\D/g, '');
+    if (digits !== event.target.value) {
+        studentIdInput.value = digits;
     }
 }
 
@@ -259,15 +296,17 @@ onBeforeUnmount(() => {
                     ref="inputRef"
                     v-model="studentIdInput"
                     type="text"
-                    inputmode="text"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
                     autocomplete="off"
                     autocorrect="off"
                     spellcheck="false"
-                    maxlength="64"
+                    maxlength="20"
                     class="kiosk-page__input"
                     placeholder="Student ID"
                     :disabled="busy"
                     @keydown="onKeydown"
+                    @input="onStudentIdInput"
                 />
                 <div class="kiosk-page__feedback" aria-live="polite">
                     <Transition name="kiosk-success-banner">
@@ -275,29 +314,41 @@ onBeforeUnmount(() => {
                             v-if="successCheckVisible"
                             :key="successFlashKey"
                             class="kiosk-page__success-banner"
-                            :aria-label="successLabel"
+                            :aria-label="
+                                successStudentName
+                                    ? `${successStudentName} ${successLabel}`
+                                    : successLabel
+                            "
                         >
-                            <div class="kiosk-checkmark-circle">
-                                <svg
-                                    viewBox="0 0 52 52"
-                                    class="kiosk-checkmark-svg"
-                                >
-                                    <circle
-                                        class="kiosk-checkmark-fill"
-                                        cx="26"
-                                        cy="26"
-                                        r="24"
-                                    />
-                                    <path
-                                        class="kiosk-checkmark-path"
-                                        fill="none"
-                                        d="M14 27l7.8 7.8L38 17"
-                                    />
-                                </svg>
-                            </div>
-                            <p class="kiosk-page__success-label">
-                                {{ successLabel }}
+                            <p
+                                v-if="successStudentName"
+                                class="kiosk-page__student-name"
+                            >
+                                {{ successStudentName }}
                             </p>
+                            <div class="kiosk-page__success-status">
+                                <div class="kiosk-checkmark-circle">
+                                    <svg
+                                        viewBox="0 0 52 52"
+                                        class="kiosk-checkmark-svg"
+                                    >
+                                        <circle
+                                            class="kiosk-checkmark-fill"
+                                            cx="26"
+                                            cy="26"
+                                            r="24"
+                                        />
+                                        <path
+                                            class="kiosk-checkmark-path"
+                                            fill="none"
+                                            d="M14 27l7.8 7.8L38 17"
+                                        />
+                                    </svg>
+                                </div>
+                                <p class="kiosk-page__success-label">
+                                    {{ successLabel }}
+                                </p>
+                            </div>
                         </div>
                     </Transition>
                     <p
@@ -370,16 +421,35 @@ onBeforeUnmount(() => {
 }
 
 .kiosk-page__success-banner {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(0.85rem, 3vw, 1.25rem);
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    box-sizing: border-box;
+}
+
+.kiosk-page__student-name {
+    margin: 0;
+    color: #4a2c7a;
+    font-size: clamp(1.5rem, 6.5vw, 2.75rem);
+    font-weight: 800;
+    line-height: 1.15;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    max-width: 36rem;
+}
+
+.kiosk-page__success-status {
     display: flex;
     flex-direction: row;
     align-items: center;
     justify-content: center;
     gap: clamp(0.75rem, 4vw, 1.25rem);
-    width: 100%;
-    padding: 0.25rem 0.5rem;
-    box-sizing: border-box;
 }
 
 .kiosk-page__success-label {

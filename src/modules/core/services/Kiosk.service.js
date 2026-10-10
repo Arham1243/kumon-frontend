@@ -97,7 +97,12 @@ export function parseKioskPunchResponse(res) {
         throw error;
     }
 
-    return code;
+    const studentName = payload.student_name;
+
+    return {
+        code,
+        studentName: typeof studentName === 'string' ? studentName.trim() : ''
+    };
 }
 
 export const fetchKioskCompany = (companyUuid) => {
@@ -106,6 +111,6 @@ export const fetchKioskCompany = (companyUuid) => {
 
 export const punch = (companyUuid, studentId) => {
     return PublicAxios.post(`${BASE_URL}/${companyUuid}/punch`, {
-        student_id: studentId
+        student_id: Number(studentId)
     });
 };

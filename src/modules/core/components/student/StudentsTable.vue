@@ -103,6 +103,50 @@ const resetForm = () => {
     globalStore.clearErrors();
 };
 
+const digitsOnly = (value) => String(value ?? '').replace(/\D/g, '');
+
+const onStudentIdInput = (value) => {
+    formData.value.student_id = digitsOnly(value);
+};
+
+const onStudentIdKeydown = (event) => {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+    }
+
+    const allowed = new Set([
+        'Backspace',
+        'Delete',
+        'Tab',
+        'ArrowLeft',
+        'ArrowRight',
+        'Home',
+        'End',
+        'Enter'
+    ]);
+
+    if (allowed.has(event.key)) {
+        return;
+    }
+
+    if (event.key.length === 1 && !/^\d$/.test(event.key)) {
+        event.preventDefault();
+    }
+};
+
+const onStudentIdNativeInput = (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) {
+        return;
+    }
+
+    const digits = digitsOnly(input.value);
+    if (input.value !== digits) {
+        input.value = digits;
+    }
+    formData.value.student_id = digits;
+};
+
 const editItem = () => {
     resetForm();
     formData.value.student_id = selectedItem.value.student_id;
@@ -133,10 +177,15 @@ const onPageChange = (event) => {
 const save = async () => {
     try {
         busy.value = true;
+        const studentId = digitsOnly(formData.value.student_id);
+        const payload = {
+            ...formData.value,
+            student_id: studentId === '' ? '' : Number(studentId)
+        };
         if (isEditMode.value) {
-            await studentStore.update(selectedItem.value.uuid, formData.value);
+            await studentStore.update(selectedItem.value.uuid, payload);
         } else {
-            await studentStore.create(formData.value);
+            await studentStore.create(payload);
         }
         closeDialog();
         await getItems();
@@ -300,8 +349,14 @@ const deleteItem = async () => {
             <InputField
                 variant="text"
                 id="student_id"
-                v-model="formData.student_id"
+                :model-value="formData.student_id"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                maxlength="20"
                 class="w-full"
+                @update:model-value="onStudentIdInput"
+                @keydown="onStudentIdKeydown"
+                @input="onStudentIdNativeInput"
                 @keyup.enter="save"
                 :disabled="busy"
             />

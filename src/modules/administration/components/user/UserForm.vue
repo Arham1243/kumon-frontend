@@ -41,6 +41,7 @@ const { isDirty, resetDirty } = useFormDirty(formData, null, {
 
 const roles = ref([]);
 const loadingRoles = ref(false);
+const selectedRole = ref(null);
 
 const canToggleActiveInactive = computed(() => {
     if (!isEditMode.value) {
@@ -84,16 +85,48 @@ watch(
     }
 );
 
-const getRoles = async () => {
+watch(
+    () => formData.value.role_id,
+    (id) => {
+        if (id == null || id === '') {
+            selectedRole.value = null;
+            return;
+        }
+        const match = roles.value.find((role) => role.id === id);
+        if (match) {
+            selectedRole.value = { id: match.id, name: match.name };
+        }
+    }
+);
+
+function ensureSelectedRoleInOptions(searchText = '') {
+    const current = selectedRole.value;
+    if (!current?.id) return;
+
+    const query = String(searchText ?? '').trim().toLowerCase();
+    const matchesQuery =
+        !query || current.name?.toLowerCase().includes(query);
+    if (!matchesQuery) return;
+    if (roles.value.some((role) => role.id === current.id)) return;
+
+    roles.value = [current, ...roles.value];
+}
+
+const getRoles = async (searchText = '') => {
     try {
         loadingRoles.value = true;
         const res = await roleStore.search(
-            { sort: [{ field: 'name', direction: 'asc' }] },
+            {
+                search: { value: searchText ?? '' },
+                sort: [{ field: 'name', direction: 'asc' }]
+            },
             { limit: 100 }
         );
-        roles.value = res.data;
+        roles.value = res.data ?? [];
+        ensureSelectedRoleInOptions(searchText);
     } catch {
         roles.value = [];
+        ensureSelectedRoleInOptions(searchText);
     } finally {
         loadingRoles.value = false;
     }
@@ -109,14 +142,20 @@ const getItem = async () => {
         const res = await userStore.show(adminUuid.value);
         const admin = res.data;
 
+        const role = admin.role?.id
+            ? { id: admin.role.id, name: admin.role.name }
+            : null;
+        selectedRole.value = role;
+
         formData.value = {
             name: admin.name || '',
             email: admin.email || '',
             password: '',
-            role_id: admin.role?.id ?? admin.role_id ?? null,
+            role_id: role?.id ?? admin.role_id ?? null,
             status: admin.status || 'active',
             profile_image: admin.profile_image || null
         };
+        ensureSelectedRoleInOptions();
 
         resetDirty(formData.value);
 
@@ -325,17 +364,20 @@ const cancelDisabled = computed(() => {
 
                     <div class="col-span-12 lg:col-span-3">
                         <label class="block mb-3 required">Role</label>
-                        <InputField
+                        <ApiDropdown
                             id="role_id"
-                            :disabled="busy || loadingRoles"
-                            class="w-full"
-                            v-model="formData.role_id"
-                            variant="dropdown"
-                            optionLabel="name"
-                            optionValue="id"
-                            :options="roles"
                             filter
                             showClear
+                            :autoFetchOnMount="false"
+                            placeholder="Select"
+                            :loading="loadingRoles"
+                            :disabled="busy"
+                            class="w-full"
+                            v-model="formData.role_id"
+                            :options="roles"
+                            optionLabel="name"
+                            optionValue="id"
+                            @search="(searchText) => getRoles(searchText)"
                         />
                     </div>
 
