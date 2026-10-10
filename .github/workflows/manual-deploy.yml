@@ -44,6 +44,8 @@ jobs:
         outputs:
             branch: ${{ steps.map.outputs.branch }}
             environment: ${{ steps.map.outputs.environment }}
+            api_base_url: ${{ steps.map.outputs.api_base_url }}
+            app_url: ${{ steps.map.outputs.app_url }}
             ftp_server_secret: ${{ steps.map.outputs.ftp_server_secret }}
             ftp_username_secret: ${{ steps.map.outputs.ftp_username_secret }}
             ftp_password_secret: ${{ steps.map.outputs.ftp_password_secret }}
@@ -56,6 +58,8 @@ jobs:
                   case "$SELECTED_BRANCH" in
                     main)
                       environment=main
+                      api_base_url=https://kumon.servicore.io/backend
+                      app_url=https://kumon.servicore.io
                       ftp_server_secret=FTP_SERVER_MAIN
                       ftp_username_secret=FTP_USERNAME_MAIN
                       ftp_password_secret=FTP_PASSWORD_MAIN
@@ -65,6 +69,8 @@ jobs:
                   {
                     echo "branch=$SELECTED_BRANCH"
                     echo "environment=$environment"
+                    echo "api_base_url=$api_base_url"
+                    echo "app_url=$app_url"
                     echo "ftp_server_secret=$ftp_server_secret"
                     echo "ftp_username_secret=$ftp_username_secret"
                     echo "ftp_password_secret=$ftp_password_secret"
@@ -89,10 +95,11 @@ jobs:
                   npm install
                   npm run build
               env:
-                  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+                  VITE_API_BASE_URL: ${{ needs.resolve.outputs.api_base_url }}
+                  VITE_APP_URL: ${{ needs.resolve.outputs.app_url }}
 
             - name: Sync build to ${{ needs.resolve.outputs.environment }}
-              uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+              uses: SamKirkland/FTP-Deploy-Action@v4.3.6
               with:
                   server: ${{ secrets[needs.resolve.outputs.ftp_server_secret] }}
                   username: ${{ secrets[needs.resolve.outputs.ftp_username_secret] }}
@@ -101,7 +108,6 @@ jobs:
                   port: 21
                   security: loose
                   log-level: verbose
-                  state-name: kumon-frontend-ftp-${{ needs.resolve.outputs.environment }}
                   timeout: 600000
                   local-dir: ./dist/
                   server-dir: /
