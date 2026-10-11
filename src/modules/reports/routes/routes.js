@@ -9,16 +9,6 @@ export default [
         }
     },
     {
-        path: 'reports/scheduled-jobs',
-        name: 'ScheduledJobs',
-        component: () =>
-            import('@/modules/reports/views/scheduled-job/index.vue'),
-        meta: {
-            breadcrumb: [{ label: 'Reports' }, { label: 'Scheduled Jobs' }],
-            permission: 'reports.scheduled-jobs.view'
-        }
-    },
-    {
         path: 'reports/audit-logs',
         name: 'AuditLogs',
         component: () => import('@/modules/reports/views/audit-log/index.vue'),
@@ -30,10 +20,6 @@ export default [
     {
         path: 'email-logs',
         redirect: { name: 'EmailLogs' }
-    },
-    {
-        path: 'scheduled-jobs',
-        redirect: { name: 'ScheduledJobs' }
     },
     {
         path: 'audit-logs',
