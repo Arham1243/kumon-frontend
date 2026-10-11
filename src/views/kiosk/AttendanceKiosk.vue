@@ -166,17 +166,18 @@ async function loadCompany() {
 
 async function submitPunch() {
     const code = studentIdInput.value.trim();
-    studentIdInput.value = '';
-    await focusInput();
 
     if (!code || busy.value || loadFailure.value || !company.value) {
         return;
     }
 
     busy.value = true;
+    inputRef.value?.blur?.();
+
     try {
         const res = await punch(companyUuid.value, code);
         const result = parseKioskPunchResponse(res);
+        studentIdInput.value = '';
         showStatus(result.code, result.studentName);
     } catch (err) {
         if (err.code === 'kiosk_bad_response') {
@@ -202,8 +203,16 @@ async function submitPunch() {
     }
 }
 
+function onInputBlur() {
+    // Phone and iPad numeric keyboards often close on Go instead of sending Enter.
+    if (busy.value || !studentIdInput.value.trim()) {
+        return;
+    }
+    submitPunch();
+}
+
 function onKeydown(event) {
-    if (event.key === 'Enter') {
+    if (event.key === 'Enter' || event.keyCode === 13) {
         event.preventDefault();
         submitPunch();
         return;
@@ -291,23 +300,43 @@ onBeforeUnmount(() => {
                 <p class="kiosk-page__date">{{ dateLine }}</p>
             </div>
 
-            <div class="kiosk-page__center">
-                <input
-                    ref="inputRef"
-                    v-model="studentIdInput"
-                    type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    autocomplete="off"
-                    autocorrect="off"
-                    spellcheck="false"
-                    maxlength="20"
-                    class="kiosk-page__input"
-                    placeholder="Student ID"
-                    :disabled="busy"
-                    @keydown="onKeydown"
-                    @input="onStudentIdInput"
-                />
+            <form
+                class="kiosk-page__center"
+                novalidate
+                @submit.prevent="submitPunch"
+            >
+                <div
+                    class="kiosk-page__field"
+                    :class="{ 'kiosk-page__field--busy': busy }"
+                >
+                    <input
+                        ref="inputRef"
+                        v-model="studentIdInput"
+                        type="text"
+                        inputmode="numeric"
+                        enterkeyhint="go"
+                        pattern="[0-9]*"
+                        autocomplete="off"
+                        autocorrect="off"
+                        spellcheck="false"
+                        maxlength="20"
+                        class="kiosk-page__input"
+                        placeholder="Student ID"
+                        :readonly="busy"
+                        :aria-busy="busy"
+                        @keydown="onKeydown"
+                        @input="onStudentIdInput"
+                        @blur="onInputBlur"
+                    />
+                    <span
+                        v-if="busy"
+                        class="kiosk-page__field-overlay"
+                        aria-hidden="true"
+                    />
+                </div>
+                <button type="submit" class="kiosk-page__submit" tabindex="-1">
+                    Go
+                </button>
                 <div class="kiosk-page__feedback" aria-live="polite">
                     <Transition name="kiosk-success-banner">
                         <div
@@ -353,17 +382,18 @@ onBeforeUnmount(() => {
                     </Transition>
                     <p
                         class="kiosk-page__status"
-                        :class="{
-                            'kiosk-page__status--visible':
-                                statusVisible && !successCheckVisible,
-                            [`kiosk-page__status--${statusTone}`]:
-                                statusVisible && !successCheckVisible
-                        }"
+                        :class="[
+                            `kiosk-page__status--${statusTone}`,
+                            {
+                                'kiosk-page__status--visible':
+                                    statusVisible && !successCheckVisible
+                            }
+                        ]"
                     >
                         {{ statusMessage }}
                     </p>
                 </div>
-            </div>
+            </form>
         </template>
         <div
             v-else
@@ -376,8 +406,12 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .kiosk-page {
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100lvh;
+    max-height: 100vh;
+    max-height: 100lvh;
+    min-height: 0;
+    overflow: hidden;
     display: grid;
     grid-template-rows: 1fr auto 1fr;
     align-items: stretch;
@@ -399,6 +433,7 @@ onBeforeUnmount(() => {
 }
 
 .kiosk-page__center {
+    position: relative;
     grid-row: 2;
     display: flex;
     flex-direction: column;
@@ -408,27 +443,44 @@ onBeforeUnmount(() => {
     width: 100%;
     max-width: 30rem;
     padding-inline: 0.25rem;
+    margin: 0;
+}
+
+.kiosk-page__submit {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .kiosk-page__feedback {
     position: relative;
     width: 100%;
+    height: clamp(4.25rem, 18vw, 5.75rem);
     min-height: clamp(4.25rem, 18vw, 5.75rem);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    max-height: clamp(4.25rem, 18vw, 5.75rem);
     flex-shrink: 0;
+    overflow: visible;
 }
 
 .kiosk-page__success-banner {
-    position: relative;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: clamp(0.85rem, 3vw, 1.25rem);
-    width: 100%;
-    padding: 0.25rem 0.5rem;
+    width: auto;
+    margin: 0;
+    padding: 0 0.5rem;
     box-sizing: border-box;
 }
 
@@ -506,15 +558,12 @@ onBeforeUnmount(() => {
 
 .kiosk-success-banner-enter-active,
 .kiosk-success-banner-leave-active {
-    transition:
-        opacity 0.2s ease,
-        transform 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 
 .kiosk-success-banner-enter-from,
 .kiosk-success-banner-leave-to {
     opacity: 0;
-    transform: translateY(-0.35rem);
 }
 
 .kiosk-page__message {
@@ -564,6 +613,19 @@ onBeforeUnmount(() => {
     text-align: center;
 }
 
+.kiosk-page__field {
+    position: relative;
+    width: 100%;
+}
+
+.kiosk-page__field-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: rgba(74, 44, 122, 0.06);
+    pointer-events: auto;
+}
+
 .kiosk-page__input {
     width: 100%;
     margin: 0;
@@ -582,6 +644,13 @@ onBeforeUnmount(() => {
     appearance: none;
 }
 
+.kiosk-page__field--busy .kiosk-page__input {
+    color: #4a2c7a;
+    background: #f1e6fa;
+    border-color: #c94f9b;
+    pointer-events: none;
+}
+
 .kiosk-page__input::placeholder {
     color: #757575;
     font-size: 1em;
@@ -593,28 +662,26 @@ onBeforeUnmount(() => {
     box-shadow: 0 0 0 3px rgba(201, 79, 155, 0.25);
 }
 
-.kiosk-page__input:disabled {
-    opacity: 0.7;
+.kiosk-page__field--busy .kiosk-page__input:focus {
+    box-shadow: none;
 }
 
 .kiosk-page__status {
     position: absolute;
     top: 0;
-    bottom: 0;
     left: 0;
     right: 0;
-    width: 100%;
-    margin-inline: auto;
+    width: auto;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    margin-block: 0;
+    margin: 0;
     padding: 0 0.75rem;
     box-sizing: border-box;
-    color: #4a2c7a;
-    font-size: clamp(1.0625rem, 3.5vw, 1.25rem);
-    font-weight: 600;
-    line-height: 1.35;
+    color: #5f4f7a;
+    font-size: clamp(1.125rem, 4vw, 1.375rem);
+    font-weight: 500;
+    line-height: 1.45;
     text-align: center;
     text-wrap: balance;
     opacity: 0;
@@ -628,9 +695,6 @@ onBeforeUnmount(() => {
 
 .kiosk-page__status--notice {
     color: #5f4f7a;
-    font-weight: 500;
-    font-size: clamp(1.125rem, 4vw, 1.375rem);
-    line-height: 1.45;
 }
 
 .kiosk-page__status--error {
