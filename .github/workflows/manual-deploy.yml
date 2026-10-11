@@ -81,8 +81,6 @@ jobs:
                     exit 1
                   fi
 
-                  echo "Deploy target branch=$SELECTED_BRANCH environment=$environment api_base_url=$api_base_url"
-
                   {
                     echo "branch=$SELECTED_BRANCH"
                     echo "environment=$environment"
@@ -113,7 +111,6 @@ jobs:
                     echo "::error::VITE_API_BASE_URL is empty. Refusing to build."
                     exit 1
                   fi
-                  echo "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
                   npm install
                   npm run build
               env:
@@ -125,7 +122,6 @@ jobs:
                     echo "::error::Production build is missing VITE_API_BASE_URL ($VITE_API_BASE_URL)."
                     exit 1
                   fi
-                  echo "Bundle contains VITE_API_BASE_URL=$VITE_API_BASE_URL"
               env:
                   VITE_API_BASE_URL: ${{ needs.resolve.outputs.api_base_url }}
 
