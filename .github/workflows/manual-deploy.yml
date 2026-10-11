@@ -55,6 +55,12 @@ jobs:
               env:
                   SELECTED_BRANCH: ${{ github.event.inputs.branch }}
               run: |
+                  environment=
+                  api_base_url=
+                  app_url=
+                  ftp_server_secret=
+                  ftp_username_secret=
+                  ftp_password_secret=
                   case "$SELECTED_BRANCH" in
                     main)
                       environment=main
@@ -64,7 +70,18 @@ jobs:
                       ftp_username_secret=FTP_USERNAME_MAIN
                       ftp_password_secret=FTP_PASSWORD_MAIN
                       ;;
+                    *)
+                      echo "::error::No deploy target mapped for branch '$SELECTED_BRANCH'."
+                      exit 1
+                      ;;
                   esac
+
+                  if [ -z "$api_base_url" ]; then
+                    echo "::error::api_base_url is empty for branch '$SELECTED_BRANCH'."
+                    exit 1
+                  fi
+
+                  echo "Deploy target branch=$SELECTED_BRANCH environment=$environment api_base_url=$api_base_url"
 
                   {
                     echo "branch=$SELECTED_BRANCH"
@@ -92,8 +109,23 @@ jobs:
 
             - name: Build Vue app for ${{ needs.resolve.outputs.environment }}
               run: |
+                  if [ -z "$VITE_API_BASE_URL" ]; then
+                    echo "::error::VITE_API_BASE_URL is empty. Refusing to build."
+                    exit 1
+                  fi
+                  echo "Building with VITE_API_BASE_URL=$VITE_API_BASE_URL"
                   npm install
                   npm run build
+              env:
+                  VITE_API_BASE_URL: ${{ needs.resolve.outputs.api_base_url }}
+
+            - name: Verify API base URL is baked into the production bundle
+              run: |
+                  if ! grep -rqF "$VITE_API_BASE_URL" dist/assets/; then
+                    echo "::error::Production build is missing VITE_API_BASE_URL ($VITE_API_BASE_URL)."
+                    exit 1
+                  fi
+                  echo "Bundle contains VITE_API_BASE_URL=$VITE_API_BASE_URL"
               env:
                   VITE_API_BASE_URL: ${{ needs.resolve.outputs.api_base_url }}
 
