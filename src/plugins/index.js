@@ -1,4 +1,3 @@
-import { effectScope } from 'vue';
 import { startVersionCheck } from '@/composables/useVersionCheck';
 import router from '@/routes';
 import pinia from '@/stores';
@@ -23,9 +22,7 @@ export function registerPlugins(app) {
     app.use(router);
     app.use(pinia);
 
-    effectScope(() => {
-        startVersionCheck();
-    });
+    startVersionCheck();
 
     app.use(PrimeVue, {
         ripple: true,
