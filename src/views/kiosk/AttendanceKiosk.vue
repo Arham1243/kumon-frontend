@@ -92,6 +92,13 @@ const readerConnected = computed(
     () => readerStatus.value === 'connected'
 );
 
+const showIdleHint = computed(
+    () =>
+        !busy.value &&
+        !successCheckVisible.value &&
+        !statusVisible.value
+);
+
 const canAcceptTap = computed(
     () =>
         !busy.value &&
@@ -111,7 +118,7 @@ function resolveStatusTone(code) {
     return 'notice';
 }
 
-function showSuccessCheck(code, studentName) {
+function showSuccessCheck(code, studentName, displayMs = 2000) {
     successStudentName.value = String(studentName ?? '').trim();
     successLabel.value =
         code === 'checked_out' ? 'Checked out' : 'Checked in';
@@ -123,7 +130,7 @@ function showSuccessCheck(code, studentName) {
     successCheckTimer = setTimeout(async () => {
         successCheckVisible.value = false;
         await focusInput();
-    }, 2000);
+    }, displayMs);
 }
 
 function showStatus(code, studentName = '') {
@@ -309,11 +316,28 @@ function onStudentIdInput(event) {
     }
 }
 
+function maybePreviewKioskSuccess() {
+    if (!import.meta.env.DEV) {
+        return;
+    }
+    const preview = String(route.query.preview ?? '').toLowerCase();
+    if (!preview || loadFailure.value || !company.value) {
+        return;
+    }
+    const name = String(route.query.name ?? 'Arham').trim() || 'Arham';
+    const code =
+        preview === 'checkout' || preview === 'out'
+            ? 'checked_out'
+            : 'checked_in';
+    showSuccessCheck(code, name, 15000);
+}
+
 onBeforeMount(async () => {
     clockTimer = setInterval(() => {
         now.value = dayjs();
     }, 30_000);
     await loadCompany();
+    maybePreviewKioskSuccess();
 });
 
 onBeforeUnmount(() => {
@@ -376,9 +400,6 @@ onBeforeUnmount(() => {
 
                 <h1 class="kiosk-page__company">{{ company?.name }}</h1>
                 <p class="kiosk-page__date">{{ dateLine }}</p>
-                <p class="kiosk-page__hint">
-                    Enter your Student ID or tap your card on the reader.
-                </p>
             </div>
 
             <form
@@ -388,7 +409,10 @@ onBeforeUnmount(() => {
             >
                 <div
                     class="kiosk-page__field"
-                    :class="{ 'kiosk-page__field--busy': busy }"
+                    :class="{
+                        'kiosk-page__field--busy': busy,
+                        'kiosk-page__field--idle-hidden': successCheckVisible
+                    }"
                 >
                     <input
                         ref="inputRef"
@@ -418,7 +442,13 @@ onBeforeUnmount(() => {
                 <button type="submit" class="kiosk-page__submit" tabindex="-1">
                     Go
                 </button>
-                <div class="kiosk-page__feedback" aria-live="polite">
+                <div class="kiosk-page__message-slot" aria-live="polite">
+                    <p
+                        v-show="showIdleHint"
+                        class="kiosk-page__hint"
+                    >
+                        Enter your Student ID or tap your card on the reader.
+                    </p>
                     <Transition name="kiosk-success-banner">
                         <div
                             v-if="successCheckVisible"
@@ -500,6 +530,8 @@ onBeforeUnmount(() => {
     border-radius: 9999px;
     background: rgba(255, 255, 255, 0.85);
     box-shadow: 0 1px 4px rgba(74, 44, 122, 0.12);
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 .kiosk-page__reader-dot {
@@ -559,10 +591,10 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(0.75rem, 3vw, 1.25rem);
+    gap: clamp(0.85rem, 3vw, 1.35rem);
     width: 100%;
-    max-width: 30rem;
-    padding-inline: 0.25rem;
+    max-width: min(100%, 52rem);
+    padding-inline: clamp(0.5rem, 3vw, 1.25rem);
     margin: 0;
 }
 
@@ -578,14 +610,30 @@ onBeforeUnmount(() => {
     border: 0;
 }
 
-.kiosk-page__feedback {
+.kiosk-page__message-slot {
     position: relative;
     width: 100%;
-    height: clamp(4.25rem, 18vw, 5.75rem);
-    min-height: clamp(4.25rem, 18vw, 5.75rem);
-    max-height: clamp(4.25rem, 18vw, 5.75rem);
+    height: clamp(7.5rem, 26vw, 10.5rem);
+    min-height: clamp(7.5rem, 26vw, 10.5rem);
     flex-shrink: 0;
-    overflow: visible;
+    overflow: hidden;
+}
+
+.kiosk-page__hint {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(100%, calc(100vw - 2.5rem));
+    margin: 0;
+    padding: 0 0.5rem;
+    color: #4a2c7a;
+    font-size: clamp(1rem, 2.85vw, 1.5rem);
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+    text-wrap: balance;
+    box-sizing: border-box;
 }
 
 .kiosk-page__success-banner {
@@ -597,8 +645,8 @@ onBeforeUnmount(() => {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    gap: clamp(0.85rem, 3vw, 1.25rem);
-    width: auto;
+    gap: clamp(0.65rem, 2.5vw, 1rem);
+    width: 100%;
     margin: 0;
     padding: 0 0.5rem;
     box-sizing: border-box;
@@ -733,19 +781,10 @@ onBeforeUnmount(() => {
     text-align: center;
 }
 
-.kiosk-page__hint {
-    margin: 0.75rem 0 0;
-    max-width: 28rem;
-    color: #5c4a7a;
-    font-size: clamp(1rem, 3.5vw, 1.25rem);
-    font-weight: 600;
-    line-height: 1.35;
-    text-align: center;
-}
-
 .kiosk-page__field {
     position: relative;
-    width: 100%;
+    width: min(100%, clamp(12.5rem, 52vw, 18rem));
+    max-width: 18rem;
 }
 
 .kiosk-page__field-overlay {
@@ -756,11 +795,16 @@ onBeforeUnmount(() => {
     pointer-events: auto;
 }
 
+.kiosk-page__field--idle-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
 .kiosk-page__input {
     width: 100%;
     margin: 0;
-    padding: 0.55em 1em;
-    font-size: clamp(1.75rem, 6.5vw, 2.125rem);
+    padding: 0.5em 1em;
+    font-size: clamp(1.875rem, 7vw, 2.375rem);
     font-weight: 600;
     line-height: 1.2;
     text-align: center;
