@@ -133,10 +133,10 @@ function showSuccessCheck(code, studentName, displayMs = 2000) {
     }, displayMs);
 }
 
-function showStatus(code, studentName = '') {
+function showStatus(code, studentName = '', displayMs = 4000) {
     if (SUCCESS_CODES.has(code)) {
         statusVisible.value = false;
-        showSuccessCheck(code, studentName);
+        showSuccessCheck(code, studentName, displayMs === 4000 ? 2000 : displayMs);
         return;
     }
 
@@ -153,7 +153,7 @@ function showStatus(code, studentName = '') {
     }
     statusTimer = setTimeout(() => {
         statusVisible.value = false;
-    }, 4000);
+    }, displayMs);
 }
 
 async function focusInput() {
@@ -316,7 +316,7 @@ function onStudentIdInput(event) {
     }
 }
 
-function maybePreviewKioskSuccess() {
+function maybePreviewKioskState() {
     if (!import.meta.env.DEV) {
         return;
     }
@@ -324,12 +324,27 @@ function maybePreviewKioskSuccess() {
     if (!preview || loadFailure.value || !company.value) {
         return;
     }
+
     const name = String(route.query.name ?? 'Arham').trim() || 'Arham';
-    const code =
-        preview === 'checkout' || preview === 'out'
-            ? 'checked_out'
-            : 'checked_in';
-    showSuccessCheck(code, name, 15000);
+    const PREVIEW_MS = 15000;
+
+    if (preview === 'checkout' || preview === 'out') {
+        showSuccessCheck('checked_out', name, PREVIEW_MS);
+        return;
+    }
+    if (preview === 'checkin' || preview === 'in' || preview === 'success') {
+        showSuccessCheck('checked_in', name, PREVIEW_MS);
+        return;
+    }
+
+    const errorCode =
+        preview === 'error' || preview === 'err'
+            ? 'card_not_registered'
+            : preview;
+
+    if (STATUS_MESSAGES[errorCode] && !SUCCESS_CODES.has(errorCode)) {
+        showStatus(errorCode, '', PREVIEW_MS);
+    }
 }
 
 onBeforeMount(async () => {
@@ -337,7 +352,7 @@ onBeforeMount(async () => {
         now.value = dayjs();
     }, 30_000);
     await loadCompany();
-    maybePreviewKioskSuccess();
+    maybePreviewKioskState();
 });
 
 onBeforeUnmount(() => {
@@ -409,10 +424,7 @@ onBeforeUnmount(() => {
             >
                 <div
                     class="kiosk-page__field"
-                    :class="{
-                        'kiosk-page__field--busy': busy,
-                        'kiosk-page__field--idle-hidden': successCheckVisible
-                    }"
+                    :class="{ 'kiosk-page__field--busy': busy }"
                 >
                     <input
                         ref="inputRef"
@@ -793,11 +805,6 @@ onBeforeUnmount(() => {
     border-radius: 9999px;
     background: rgba(74, 44, 122, 0.06);
     pointer-events: auto;
-}
-
-.kiosk-page__field--idle-hidden {
-    opacity: 0;
-    pointer-events: none;
 }
 
 .kiosk-page__input {
