@@ -3,7 +3,8 @@ export const auditLogResources = [
     { id: 'User', name: 'User' },
     { id: 'Role', name: 'Role' },
     { id: 'Scheduled Job', name: 'Scheduled Job' },
-    { id: 'Email Template', name: 'Email Template' }
+    { id: 'Email Template', name: 'Email Template' },
+    { id: 'Student', name: 'Student' }
 ];
 
 export const auditLogEvents = [

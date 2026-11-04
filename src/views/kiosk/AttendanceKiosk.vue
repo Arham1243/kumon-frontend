@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeMount, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import dayjs from '@/plugins/dayjs';
 import {
@@ -7,8 +7,10 @@ import {
     isKioskCompanyUuid,
     parseKioskCompanyResponse,
     parseKioskPunchResponse,
-    punch
+    punch,
+    punchByCard
 } from '@/modules/core/services/Kiosk.service';
+import { useCardReader } from '@/composables';
 import Loader from '@/components/common/Loader.vue';
 
 const route = useRoute();
@@ -39,6 +41,7 @@ const NOTICE_CODES = new Set([
 ]);
 const ERROR_CODES = new Set([
     'invalid_student_id',
+    'card_not_registered',
     'unable_to_record',
     'rate_limited'
 ]);
@@ -75,12 +78,28 @@ const STATUS_MESSAGES = {
     checked_in: 'Checked in successfully.',
     checked_out: 'Checked out successfully.',
     invalid_student_id: 'Student ID is not valid.',
+    card_not_registered: 'This card is not registered.',
     attendance_complete: "You're already checked out for today.",
     wait_before_checkout:
         "You're checked in. Please wait at least one minute before checking out.",
     unable_to_record: 'Unable to record attendance. Please try again.',
     rate_limited: 'Too many attempts. Please wait a moment.'
 };
+
+const { readerStatus, onCard } = useCardReader();
+
+const readerConnected = computed(
+    () => readerStatus.value === 'connected'
+);
+
+const canAcceptTap = computed(
+    () =>
+        !busy.value &&
+        !loadFailure.value &&
+        !!company.value &&
+        !successCheckVisible.value &&
+        !statusVisible.value
+);
 
 function resolveStatusTone(code) {
     if (NOTICE_CODES.has(code)) {
@@ -164,6 +183,35 @@ async function loadCompany() {
     }
 }
 
+function handlePunchError(err) {
+    if (err.code === 'kiosk_bad_response') {
+        loadFailure.value = 'error';
+        company.value = null;
+        return;
+    }
+    if (err.response?.status === 404) {
+        const message = err.response?.data?.message;
+        if (message === 'Card not registered') {
+            showStatus('card_not_registered');
+            return;
+        }
+        loadFailure.value = 'not_found';
+        company.value = null;
+        return;
+    }
+    if (err.response?.status === 429) {
+        showStatus('rate_limited');
+    } else if (err.response?.status === 422) {
+        showStatus('invalid_student_id');
+    } else {
+        showStatus('unable_to_record');
+    }
+}
+
+function applyPunchResult(result) {
+    showStatus(result.code, result.studentName);
+}
+
 async function submitPunch() {
     const code = studentIdInput.value.trim();
 
@@ -178,30 +226,41 @@ async function submitPunch() {
         const res = await punch(companyUuid.value, code);
         const result = parseKioskPunchResponse(res);
         studentIdInput.value = '';
-        showStatus(result.code, result.studentName);
+        applyPunchResult(result);
     } catch (err) {
-        if (err.code === 'kiosk_bad_response') {
-            loadFailure.value = 'error';
-            company.value = null;
-            return;
-        }
-        if (err.response?.status === 404) {
-            loadFailure.value = 'not_found';
-            company.value = null;
-            return;
-        }
-        if (err.response?.status === 429) {
-            showStatus('rate_limited');
-        } else if (err.response?.status === 422) {
-            showStatus('invalid_student_id');
-        } else {
-            showStatus('unable_to_record');
-        }
+        handlePunchError(err);
     } finally {
         busy.value = false;
         await focusInput();
     }
 }
+
+async function submitCardPunch(uid) {
+    if (!uid || !canAcceptTap.value) {
+        return;
+    }
+
+    busy.value = true;
+
+    try {
+        const res = await punchByCard(companyUuid.value, uid);
+        const result = parseKioskPunchResponse(res);
+        applyPunchResult(result);
+    } catch (err) {
+        handlePunchError(err);
+    } finally {
+        busy.value = false;
+        await focusInput();
+    }
+}
+
+let unsubscribeCard = null;
+
+onMounted(() => {
+    unsubscribeCard = onCard(({ uid }) => {
+        submitCardPunch(uid);
+    });
+});
 
 function onInputBlur() {
     // Phone and iPad numeric keyboards often close on Go instead of sending Enter.
@@ -258,6 +317,9 @@ onBeforeMount(async () => {
 });
 
 onBeforeUnmount(() => {
+    if (typeof unsubscribeCard === 'function') {
+        unsubscribeCard();
+    }
     if (statusTimer) {
         clearTimeout(statusTimer);
     }
@@ -272,6 +334,22 @@ onBeforeUnmount(() => {
 
 <template>
     <div class="kiosk-page">
+        <div
+            v-if="company && !loadFailure"
+            class="kiosk-page__reader"
+            :class="{
+                'kiosk-page__reader--connected': readerConnected,
+                'kiosk-page__reader--disconnected': !readerConnected
+            }"
+            aria-live="polite"
+        >
+            <span class="kiosk-page__reader-dot" aria-hidden="true" />
+            {{
+                readerConnected
+                    ? 'Card reader connected'
+                    : 'Card reader disconnected'
+            }}
+        </div>
         <div v-if="loading" class="kiosk-page__loader kiosk-page__message--centered">
             <Loader compact />
         </div>
@@ -298,6 +376,9 @@ onBeforeUnmount(() => {
 
                 <h1 class="kiosk-page__company">{{ company?.name }}</h1>
                 <p class="kiosk-page__date">{{ dateLine }}</p>
+                <p class="kiosk-page__hint">
+                    Enter your Student ID or tap your card on the reader.
+                </p>
             </div>
 
             <form
@@ -405,6 +486,45 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.kiosk-page__reader {
+    position: fixed;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.35rem 0.65rem;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 4px rgba(74, 44, 122, 0.12);
+}
+
+.kiosk-page__reader-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.kiosk-page__reader--connected {
+    color: #1b6b3a;
+}
+
+.kiosk-page__reader--connected .kiosk-page__reader-dot {
+    background: #28b856;
+}
+
+.kiosk-page__reader--disconnected {
+    color: #8b2d5c;
+}
+
+.kiosk-page__reader--disconnected .kiosk-page__reader-dot {
+    background: #c94f5b;
+}
+
 .kiosk-page {
     height: 100vh;
     height: 100lvh;
@@ -610,6 +730,16 @@ onBeforeUnmount(() => {
     font-size: clamp(1.125rem, 4.5vw, 1.875rem);
     font-weight: 700;
     line-height: 1.25;
+    text-align: center;
+}
+
+.kiosk-page__hint {
+    margin: 0.75rem 0 0;
+    max-width: 28rem;
+    color: #5c4a7a;
+    font-size: clamp(1rem, 3.5vw, 1.25rem);
+    font-weight: 600;
+    line-height: 1.35;
     text-align: center;
 }
 

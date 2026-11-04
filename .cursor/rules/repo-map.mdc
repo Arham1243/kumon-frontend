@@ -1,0 +1,13 @@
+---
+description: Repo map
+alwaysApply: true
+---
+- Stack: Vue 3, JavaScript, PrimeVue 4, Tailwind CSS, Pinia, Vue Router 4, Axios. Permissions use CASL.
+- Features: `src/modules/<name>/` with `index.js`, `routes/routes.js`, `menu.js`, `permissions.js`, `services/`, `stores/`, `views/`, `components/`. New modules start from `src/modules/_skeleton`.
+- Shared: `src/components/`, layouts in `src/layout/`, theme tokens in `src/plugins/app-preset.js`, composables in `src/composables/`, HTTP client in `src/services/Axios.service.js`.
+- Flow: component calls a Pinia store (`useXStore`), the store calls the module service, the service calls Axios.
+- Reference feature: students in `src/modules/core` (`views/student`, `components/student/StudentsTable.vue`, `services/Student.service.js`, `stores/Student.js`). Copy that layout for new features.
+- API: base URL is `VITE_API_BASE_URL` plus `/api` inside each service. The Bearer token comes from the session cookie in `Axios.service.js`. There are no shared API type files; payloads are plain objects in the service files.
+- Auth: `src/services/Auth.service.js`, `src/stores/Auth.js`, `src/stores/Session.js`, guards in `src/routes/index.js`.
+- Names: PascalCase component, service, and store files; camelCase functions and variables; kebab-case view folders; permissions like `core.students.view`.
+- Do not scan the whole repo. Read only files I mention or the reference feature.

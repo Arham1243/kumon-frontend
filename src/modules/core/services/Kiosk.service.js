@@ -114,3 +114,9 @@ export const punch = (companyUuid, studentId) => {
         student_id: Number(studentId)
     });
 };
+
+export const punchByCard = (companyUuid, uid) => {
+    return PublicAxios.post(`${BASE_URL}/${companyUuid}/card`, {
+        uid: String(uid ?? '').trim()
+    });
+};

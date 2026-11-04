@@ -18,6 +18,15 @@ export default [
         }
     },
     {
+        path: 'reports/student-cards',
+        name: 'StudentCards',
+        component: () => import('@/modules/reports/views/student-card/index.vue'),
+        meta: {
+            breadcrumb: [{ label: 'Reports' }, { label: 'Student Cards' }],
+            permission: 'reports.student-cards.view'
+        }
+    },
+    {
         path: 'email-logs',
         redirect: { name: 'EmailLogs' }
     },

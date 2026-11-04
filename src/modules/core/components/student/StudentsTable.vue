@@ -4,16 +4,23 @@ import { useStudentStore } from '@/modules/core/stores';
 import { useGlobalStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
 import { truncate } from 'lodash-es';
-import { useHelpers, useTableColumnFilters } from '@/composables';
+import {
+    useCardReader,
+    useHelpers,
+    useTableColumnFilters,
+    waitForNextCardTap
+} from '@/composables';
 import TableColumnFilter from '@/components/common/table-filters/TableColumnFilter.vue';
 import { TEXT_COLUMN_FILTER } from '@/utils/tableFilters';
 import InputField from '@/components/common/InputField.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
 import Confirmation from '@/components/common/Confirmation.vue';
+import StudentCardHistoryDialog from '@/modules/core/components/student/StudentCardHistoryDialog.vue';
 
 const helpers = useHelpers();
 const studentStore = useStudentStore();
 const globalStore = useGlobalStore();
+const { readerStatus, onCard } = useCardReader();
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions();
@@ -26,15 +33,26 @@ const busy = ref(false);
 const totalRecords = ref();
 const showDialog = ref(false);
 const deleteDialog = ref(false);
+const cardHistoryDialog = ref(false);
+const scanningCard = ref(false);
+const scanCancelToken = ref(0);
 const formData = ref({
     student_id: '',
-    name: ''
+    name: '',
+    card_uid: ''
 });
+
+const readerConnected = computed(() => readerStatus.value === 'connected');
 
 const filterColumnConfigs = [
     { field: 'student_id', filter: TEXT_COLUMN_FILTER },
-    { field: 'name', filter: TEXT_COLUMN_FILTER }
+    { field: 'name', filter: TEXT_COLUMN_FILTER },
+    { field: 'card_uid', filter: TEXT_COLUMN_FILTER }
 ];
+
+function trimCardUid(value) {
+    return String(value ?? '').trim();
+}
 
 async function getItems() {
     try {
@@ -71,6 +89,12 @@ const menuItems = computed(() => {
             permission: 'core.students.edit'
         },
         {
+            label: 'Card history',
+            icon: 'pi pi-history',
+            command: () => openCardHistoryDialog(),
+            permission: 'core.students.view'
+        },
+        {
             label: 'Delete',
             icon: 'pi pi-trash',
             command: () => showDeleteDialog(),
@@ -87,6 +111,7 @@ const openDialog = (mode = 'add') => {
 };
 
 const closeDialog = () => {
+    cancelScan();
     showDialog.value = false;
     resetForm();
 };
@@ -98,7 +123,8 @@ const onShow = () => {
 const resetForm = () => {
     formData.value = {
         student_id: '',
-        name: ''
+        name: '',
+        card_uid: ''
     };
     globalStore.clearErrors();
 };
@@ -151,6 +177,7 @@ const editItem = () => {
     resetForm();
     formData.value.student_id = selectedItem.value.student_id;
     formData.value.name = selectedItem.value.name;
+    formData.value.card_uid = selectedItem.value.card_uid ?? '';
     openDialog('edit');
 };
 
@@ -174,14 +201,21 @@ const onPageChange = (event) => {
     getItems();
 };
 
+function buildPayload() {
+    const studentId = digitsOnly(formData.value.student_id);
+    const cardUid = trimCardUid(formData.value.card_uid);
+    const payload = {
+        student_id: studentId === '' ? '' : Number(studentId),
+        name: formData.value.name,
+        card_uid: cardUid === '' ? null : cardUid
+    };
+    return payload;
+}
+
 const save = async () => {
     try {
         busy.value = true;
-        const studentId = digitsOnly(formData.value.student_id);
-        const payload = {
-            ...formData.value,
-            student_id: studentId === '' ? '' : Number(studentId)
-        };
+        const payload = buildPayload();
         if (isEditMode.value) {
             await studentStore.update(selectedItem.value.uuid, payload);
         } else {
@@ -196,6 +230,39 @@ const save = async () => {
         busy.value = false;
     }
 };
+
+function cancelScan() {
+    scanCancelToken.value += 1;
+    scanningCard.value = false;
+}
+
+async function startScanCard() {
+    if (!readerConnected.value || scanningCard.value) {
+        return;
+    }
+    scanningCard.value = true;
+    const token = ++scanCancelToken.value;
+    try {
+        const uid = await waitForNextCardTap(onCard, 15000);
+        if (token !== scanCancelToken.value) {
+            return;
+        }
+        formData.value.card_uid = uid;
+    } catch {
+        // timeout or cancelled
+    } finally {
+        if (token === scanCancelToken.value) {
+            scanningCard.value = false;
+        }
+    }
+}
+
+function openCardHistoryDialog() {
+    if (!selectedItem.value?.uuid) {
+        return;
+    }
+    cardHistoryDialog.value = true;
+}
 
 const deleteItem = async () => {
     try {
@@ -293,10 +360,31 @@ const deleteItem = async () => {
                 </Column>
 
                 <Column
+                    columnKey="card_uid"
+                    :sortable="true"
+                    field="card_uid"
+                    header="Card UID"
+                    :showFilterMenu="false"
+                    filterField="card_uid"
+                >
+                    <template #filter="{ filterModel, filterCallback }">
+                        <TableColumnFilter
+                            v-model="filterModel.value"
+                            :config="TEXT_COLUMN_FILTER"
+                            @apply="filterCallback()"
+                        />
+                    </template>
+                    <template #body="{ data }"
+                        >{{ data.card_uid || '-' }}
+                    </template>
+                </Column>
+
+                <Column
                     columnKey="actions"
                     v-if="
                         $ability.can('core.students.edit') ||
-                        $ability.can('core.students.delete')
+                        $ability.can('core.students.delete') ||
+                        $ability.can('core.students.view')
                     "
                     header="Actions"
                     class="flex justify-end"
@@ -342,8 +430,8 @@ const deleteItem = async () => {
         @cancel="closeDialog"
         @confirm="save"
     >
-        <div class="mb-3 col-span-6">
-            <label class="block required mb-3" for="student_id"
+        <div class="col-span-6">
+            <label class="block required mb-1" for="student_id"
                 >Student ID</label
             >
             <InputField
@@ -362,8 +450,8 @@ const deleteItem = async () => {
             />
         </div>
 
-        <div class="mb-3 col-span-6">
-            <label class="block required mb-3" for="name">Name</label>
+        <div class="col-span-6">
+            <label class="block required mb-1" for="name">Name</label>
             <InputField
                 variant="text"
                 id="name"
@@ -373,7 +461,52 @@ const deleteItem = async () => {
                 :disabled="busy"
             />
         </div>
+
+        <div class="col-span-12">
+            <label class="block mb-1" for="card_uid">Card UID</label>
+            <div class="flex flex-wrap items-start gap-2">
+                <div class="flex-1 min-w-[12rem]">
+                    <InputField
+                        variant="text"
+                        id="card_uid"
+                        v-model="formData.card_uid"
+                        class="w-full"
+                        maxlength="32"
+                        @keyup.enter="save"
+                        :disabled="busy || scanningCard"
+                    />
+                </div>
+                <Button
+                    v-if="readerConnected"
+                    type="button"
+                    :label="scanningCard ? 'Waiting for card…' : 'Scan card'"
+                    icon="pi pi-wifi"
+                    severity="secondary"
+                    :disabled="busy"
+                    @click="scanningCard ? cancelScan() : startScanCard()"
+                />
+            </div>
+            <p
+                v-if="scanningCard"
+                class="mt-2 text-sm text-gray-600 dark:text-gray-400"
+            >
+                Tap a card on the reader, or
+                <button
+                    type="button"
+                    class="underline text-primary"
+                    @click="cancelScan"
+                >
+                    cancel
+                </button>
+                .
+            </p>
+        </div>
     </BaseDialog>
+
+    <StudentCardHistoryDialog
+        v-model:visible="cardHistoryDialog"
+        :student="selectedItem"
+    />
 
     <Confirmation
         v-if="$ability.can('core.students.delete')"

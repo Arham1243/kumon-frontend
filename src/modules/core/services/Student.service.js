@@ -19,3 +19,11 @@ export const update = (id, payload) => {
 export const deleteItem = (id) => {
     return AxiosService.delete(`${BASE_URL}/students/${id}/delete`);
 };
+
+export const searchCardHistory = (studentUuid, payload, params) => {
+    return AxiosService.post(
+        `${BASE_URL}/students/${studentUuid}/card-histories/search`,
+        payload,
+        { params }
+    );
+};
