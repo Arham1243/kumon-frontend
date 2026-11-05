@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import {
     buildCelebrationGreeting,
+    buildCelebrationGroundSvg,
     buildCelebrationSvg,
     celebrationAriaLabel,
     greetingFontSizeStyle,
@@ -52,6 +53,10 @@ const svgHtml = computed(() =>
     })
 );
 
+const groundSvgHtml = computed(() =>
+    buildCelebrationGroundSvg(themeIndex.value)
+);
+
 const greeting = computed(() =>
     buildCelebrationGreeting(props.mode, props.name)
 );
@@ -86,6 +91,11 @@ const ariaLabel = computed(() =>
         :style="shellStyle"
     >
         <div class="kiosk-celebration__svg" v-html="svgHtml" />
+        <div
+            class="kiosk-celebration__ground"
+            v-html="groundSvgHtml"
+            aria-hidden="true"
+        />
         <p class="kiosk-celebration__greeting" :style="greetingStyle">
             {{ greeting }}
         </p>
@@ -106,16 +116,16 @@ const ariaLabel = computed(() =>
 
 .kiosk-celebration__greeting {
     position: absolute;
-    top: 6%;
+    top: 11%;
     left: 0;
     right: 0;
-    height: 30%;
+    height: 14%;
     z-index: 2;
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     justify-content: center;
     margin: 0;
-    padding: 0 clamp(0.75rem, 4vw, 1.5rem) 0.35rem;
+    padding: 0 clamp(0.75rem, 4vw, 1.5rem);
     font-family: Fredoka, system-ui, sans-serif;
     font-weight: 700;
     line-height: 1.05;
@@ -131,6 +141,23 @@ const ariaLabel = computed(() =>
 }
 
 .kiosk-celebration__svg :deep(svg) {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.kiosk-celebration__ground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 100%;
+    height: clamp(7.5rem, 22vh, 12rem);
+    pointer-events: none;
+}
+
+.kiosk-celebration__ground :deep(svg) {
     display: block;
     width: 100%;
     height: 100%;

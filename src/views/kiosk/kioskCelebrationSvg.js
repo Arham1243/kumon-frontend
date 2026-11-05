@@ -161,16 +161,16 @@ export function buildCelebrationGreeting(mode, studentName) {
 
 export function greetingFontSizeStyle(text) {
     const len = text.length;
-    let maxRem = 4.5;
+    let maxRem = 3.25;
     if (len > 20) {
-        maxRem = 2.35;
+        maxRem = 1.85;
     } else if (len > 16) {
-        maxRem = 3.15;
+        maxRem = 2.45;
     } else if (len > 12) {
-        maxRem = 3.85;
+        maxRem = 2.85;
     }
     return {
-        fontSize: `clamp(2rem, min(12vw, 10vh), ${maxRem}rem)`
+        fontSize: `clamp(1.5rem, min(8.5vw, 7vh), ${maxRem}rem)`
     };
 }
 
@@ -201,7 +201,7 @@ export function buildCelebrationSvg(
     const c = t.cols[animalIndex];
     const heroClass = reducedMotion ? '' : ' kiosk-celebration__hero';
 
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax meet" role="img" aria-hidden="true"><rect width="400" height="300" fill="${t.bg}"/><circle cx="352" cy="44" r="26" fill="${t.sun}"/>`;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMax slice" role="img" aria-hidden="true"><rect width="400" height="300" fill="${t.bg}"/><circle cx="352" cy="44" r="26" fill="${t.sun}"/>`;
     if (t.pr === 'square') {
         s +=
             '<rect x="40" y="70" width="46" height="14" fill="#fff"/><rect x="52" y="58" width="22" height="14" fill="#fff"/>';
@@ -209,9 +209,14 @@ export function buildCelebrationSvg(
     s += PROP_POSITIONS.map((p, i) =>
         prop(t.pr, p[0], p[1], p[2], t.pc[i % 3], i, reducedMotion)
     ).join('');
-    s += `<path d="M0 238 Q100 205 200 236 T400 230 V300 H0Z" fill="${t.g1}"/><path d="M0 272 Q120 250 240 274 T400 268 V300 H0Z" fill="${t.g2}"/>`;
-    s += `<g transform="translate(200 198) scale(0.76)"><g class="${heroClass.trim()}">${animal(animalIndex, c)}</g></g></svg>`;
+    s += `<g transform="translate(200 212) scale(0.65)"><g class="${heroClass.trim()}">${animal(animalIndex, c)}</g></g></svg>`;
     return s;
+}
+
+/** Full-width bottom hills for wide screens (e.g. 1920x1080) when main SVG uses slice. */
+export function buildCelebrationGroundSvg(themeIndex) {
+    const t = KIOSK_THEMES[themeIndex];
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 62" preserveAspectRatio="none" aria-hidden="true"><path d="M0 38 Q100 5 200 36 T400 30 V62 H0Z" fill="${t.g1}"/><path d="M0 52 Q120 30 240 54 T400 48 V62 H0Z" fill="${t.g2}"/></svg>`;
 }
 
 export function celebrationAriaLabel(themeIndex, animalIndex, mode, studentName) {
