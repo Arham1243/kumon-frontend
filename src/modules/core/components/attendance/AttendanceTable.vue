@@ -354,7 +354,7 @@ const deleteItem = async () => {
             />
             <Button
                 v-if="studentIdKioskUrl"
-                label="Student Attendance (Enter)"
+                label="Student Attendance (Manual)"
                 icon="pi pi-external-link"
                 severity="success"
                 class="shrink-0"

@@ -61,7 +61,7 @@ const columnsMenuItems = [
     },
     {
         field: 'causer_name',
-        header: 'User',
+        header: 'Updated By',
         sortable: false,
         filter: TEXT_COLUMN_FILTER
     }

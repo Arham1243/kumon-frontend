@@ -25,7 +25,7 @@ const props = defineProps({
     },
     helperText: {
         type: String,
-        default: 'Type the email and Press Enter to Add'
+        default: 'Type the email and Press Enter. To Add more Type and press Enter.'
     }
 });
 

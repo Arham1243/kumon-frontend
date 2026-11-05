@@ -75,7 +75,7 @@ const assignCardDialogHeader = computed(() => {
     }
     return String(row.card_uid ?? '').trim()
         ? 'Replace Card'
-        : 'Assign New Card';
+        : 'Assign Card';
 });
 
 const filterColumnConfigs = [
@@ -336,9 +336,7 @@ function buildPayload() {
         maths: formData.value.maths ? 1 : 0,
         reading: formData.value.reading ? 1 : 0,
         tuition_fee:
-            fee === null || fee === undefined || fee === ''
-                ? null
-                : Number(fee)
+            fee === null || fee === undefined || fee === '' ? null : Number(fee)
     };
 
     if (!isEditMode.value) {
@@ -565,22 +563,7 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
-                <Column
-                    columnKey="end_date"
-                    :sortable="true"
-                    field="end_date"
-                    header="End Date"
-                    :showFilterMenu="false"
-                >
-                    <template #body="{ data }">
-                        {{
-                            data.end_date
-                                ? helpers.formatDate(data.end_date)
-                                : '-'
-                        }}
-                    </template>
-                </Column>
-
+            
                 <Column
                     columnKey="enrolled_subjects"
                     header="Enrolled Subjects"
@@ -597,51 +580,23 @@ const changeStatus = async () => {
                         <span v-else>-</span>
                     </template>
                 </Column>
-
                 <Column
-                    columnKey="tuition_fee"
+                    columnKey="end_date"
                     :sortable="true"
-                    field="tuition_fee"
-                    header="Tuition Fee"
+                    field="end_date"
+                    header="End Date"
                     :showFilterMenu="false"
-                    filterField="tuition_fee"
-                    bodyClass="text-right"
-                    headerClass="text-right"
                 >
-                    <template #filter="{ filterModel, filterCallback }">
-                        <TableColumnFilter
-                            v-model="filterModel.value"
-                            :config="NUMBER_COLUMN_FILTER"
-                            @apply="filterCallback()"
-                        />
-                    </template>
                     <template #body="{ data }">
-                        <span class="block text-right">
-                            {{ helpers.formatMoney(data.tuition_fee) }}
-                        </span>
+                        {{
+                            data.end_date
+                                ? helpers.formatDate(data.end_date)
+                                : '-'
+                        }}
                     </template>
                 </Column>
 
-                <Column
-                    columnKey="card_uid"
-                    :sortable="true"
-                    field="card_uid"
-                    header="Card UID"
-                    :showFilterMenu="false"
-                    filterField="card_uid"
-                >
-                    <template #filter="{ filterModel, filterCallback }">
-                        <TableColumnFilter
-                            v-model="filterModel.value"
-                            :config="TEXT_COLUMN_FILTER"
-                            @apply="filterCallback()"
-                        />
-                    </template>
-                    <template #body="{ data }"
-                        >{{ data.card_uid || '-' }}
-                    </template>
-                </Column>
-
+                
                 <Column
                     columnKey="status"
                     :sortable="true"
@@ -667,6 +622,7 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
+         
                 <Column
                     columnKey="actions"
                     v-if="$ability.can('core.students.edit')"
@@ -835,7 +791,6 @@ const changeStatus = async () => {
                     :disabled="busy"
                 />
             </div>
-
 
             <div v-if="!isEditMode" class="col-span-12">
                 <label class="block mb-2" for="assign_card_switch">
