@@ -41,9 +41,23 @@ const kioskUrl = computed(() => {
     return `${window.location.origin}/attendance/${uuid}`;
 });
 
+const studentIdKioskUrl = computed(() => {
+    const uuid = sessionStore.myCompany?.uuid;
+    if (!uuid) {
+        return null;
+    }
+    return `${window.location.origin}/attendance/${uuid}/id`;
+});
+
 function openKiosk() {
     if (kioskUrl.value) {
         window.open(kioskUrl.value, '_blank', 'noopener,noreferrer');
+    }
+}
+
+function openStudentIdKiosk() {
+    if (studentIdKioskUrl.value) {
+        window.open(studentIdKioskUrl.value, '_blank', 'noopener,noreferrer');
     }
 }
 
@@ -157,7 +171,9 @@ async function exportFilteredReport(format) {
 async function loadStudents(searchText = '') {
     try {
         loadingStudents.value = true;
-        const res = await attendanceStore.studentOptions({ search: searchText });
+        const res = await attendanceStore.studentOptions({
+            search: searchText
+        });
         students.value = res.data ?? [];
     } finally {
         loadingStudents.value = false;
@@ -263,7 +279,10 @@ const save = async () => {
     try {
         busy.value = true;
         if (isEditMode.value) {
-            await attendanceStore.update(selectedItem.value.uuid, formData.value);
+            await attendanceStore.update(
+                selectedItem.value.uuid,
+                formData.value
+            );
         } else {
             await attendanceStore.create(formData.value);
         }
@@ -307,7 +326,7 @@ const deleteItem = async () => {
                     class="block text-sm mb-1 text-surface-700 dark:text-surface-200"
                     for="attendance_student_filter"
                 >
-                   Filter by Student
+                    Filter by Student
                 </label>
                 <ApiDropdown
                     filter
@@ -327,11 +346,19 @@ const deleteItem = async () => {
             </div>
             <Button
                 v-if="kioskUrl"
-                label="Student Attendance"
+                label="Student Attendance (Scan)"
                 icon="pi pi-external-link"
                 severity="success"
                 class="shrink-0"
                 @click="openKiosk"
+            />
+            <Button
+                v-if="studentIdKioskUrl"
+                label="Student Attendance (Enter)"
+                icon="pi pi-external-link"
+                severity="success"
+                class="shrink-0"
+                @click="openStudentIdKiosk"
             />
             <Button
                 v-if="$ability.can('core.attendance.create')"

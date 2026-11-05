@@ -2,7 +2,6 @@
 import { computed, onBeforeMount, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/modules/administration/stores';
-import { useGlobalStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
 import { useHelpers, useTableColumnFilters } from '@/composables';
 import TableColumnFilter from '@/components/common/table-filters/TableColumnFilter.vue';
@@ -11,13 +10,11 @@ import { TEXT_COLUMN_FILTER, USER_STATUS_FILTER } from '@/utils/tableFilters';
 const helpers = useHelpers();
 const router = useRouter();
 const userStore = useUserStore();
-const globalStore = useGlobalStore();
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions();
 const menu = ref();
 
-const deleteDialog = ref(false);
 const selectedItem = ref(null);
 const loading = ref(false);
 const items = ref([]);
@@ -33,7 +30,10 @@ async function getItems() {
             includes: [{ relation: 'role' }]
         };
         if (!payload.sort || payload.sort.length === 0) {
-            payload.sort = [{ field: 'name', direction: 'asc' }];
+            payload.sort = [
+                { field: 'status', direction: 'asc' },
+                { field: 'name', direction: 'asc' }
+            ];
         }
         const res = await userStore.search(payload, params);
         items.value = res.data;
@@ -66,7 +66,7 @@ const columnsMenuItems = [
         field: 'status',
         header: 'Status',
         sortable: true,
-        filter: { ...USER_STATUS_FILTER, defaultActive: false }
+        filter: USER_STATUS_FILTER
     }
 ];
 
@@ -101,21 +101,11 @@ const menuItems = computed(() => {
             icon: isItemActive.value ? 'pi pi-times' : 'pi pi-check',
             permission: 'administration.users.edit',
             command: () => showChangeStatusDialog()
-        },
-        {
-            label: 'Delete',
-            icon: 'pi pi-trash',
-            permission: 'administration.users.delete',
-            command: () => showDeleteDialog()
         }
     ].filter(Boolean);
 
     return helpers.filterByPermission(allMenuItems);
 });
-
-const showDeleteDialog = () => {
-    deleteDialog.value = true;
-};
 
 const isItemActive = computed(() => {
     return selectedItem.value && selectedItem.value.status === 'active';
@@ -139,23 +129,6 @@ const onSortChange = (event) => {
 const onPageChange = (event) => {
     pagination.updatePageParams(event);
     getItems();
-};
-
-const deleteItem = async () => {
-    try {
-        loading.value = true;
-        if (selectedItem.value) {
-            await userStore.deleteItem(selectedItem.value.uuid);
-        }
-        await getItems();
-        selectedItem.value = {};
-    } catch (error) {
-        const message =
-            error?.response?.data?.message || 'This user could not be deleted.';
-        globalStore.showError('Cannot delete user', message);
-    } finally {
-        loading.value = false;
-    }
 };
 
 const changeStatus = async () => {
@@ -259,10 +232,7 @@ const changeStatus = async () => {
                 </Column>
 
                 <Column
-                    v-if="
-                        $ability.can('administration.users.edit') ||
-                        $ability.can('administration.users.delete')
-                    "
+                    v-if="$ability.can('administration.users.edit')"
                     columnKey="actions"
                     header="Actions"
                     class="flex justify-end"
@@ -303,16 +273,4 @@ const changeStatus = async () => {
         @confirm="changeStatus"
     />
 
-    <Confirmation
-        v-model="deleteDialog"
-        variant="danger"
-        header="Delete User"
-        :content="
-            selectedItem
-                ? `Delete user \u201C${selectedItem.name}\u201D? This action cannot be undone.`
-                : 'Delete this user?'
-        "
-        confirm-button-text="Delete"
-        @confirm="deleteItem"
-    />
 </template>

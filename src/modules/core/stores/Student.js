@@ -5,6 +5,13 @@ import { StudentService } from '@/modules/core/services';
 export const useStudentStore = defineStore('StudentStore', () => {
     const globalStore = useGlobalStore();
 
+    const nextStudentId = () => {
+        return globalStore.actionWrapper(async () => {
+            const res = await StudentService.nextStudentId();
+            return res.data;
+        });
+    };
+
     const search = (payload, params) => {
         return globalStore.actionWrapper(async () => {
             const res = await StudentService.search(payload, params);
@@ -34,6 +41,30 @@ export const useStudentStore = defineStore('StudentStore', () => {
         });
     };
 
+    const updateCardUid = (id, cardUid, { isReplace = false } = {}) => {
+        return globalStore.actionWrapper(async () => {
+            const res = await StudentService.update(id, { card_uid: cardUid });
+            globalStore.showSuccess(
+                isReplace ? 'Card replaced' : 'Card assigned',
+                isReplace
+                    ? 'Student card replaced successfully'
+                    : 'Student card assigned successfully'
+            );
+            return res.data;
+        });
+    };
+
+    const changeStatus = (id, payload) => {
+        return globalStore.actionWrapper(async () => {
+            const res = await StudentService.changeStatus(id, payload);
+            globalStore.showSuccess(
+                'Student updated',
+                'Student status updated successfully'
+            );
+            return res.data;
+        });
+    };
+
     const deleteItem = (id) => {
         return globalStore.actionWrapper(async () => {
             const res = await StudentService.deleteItem(id);
@@ -46,9 +77,12 @@ export const useStudentStore = defineStore('StudentStore', () => {
     };
 
     return {
+        nextStudentId,
         search,
         create,
         update,
+        updateCardUid,
+        changeStatus,
         deleteItem
     };
 });

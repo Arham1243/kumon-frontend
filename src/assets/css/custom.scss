@@ -113,6 +113,10 @@ th {
 }
 
 /* vue-datepicker: theme tokens + fallbacks (PrimeVue 4 dropped many --p-inputtext-* vars) */
+.mx-datepicker-popup {
+    z-index: var(--mx-datepicker-z, 4001) !important;
+}
+
 .mx-input {
     box-sizing: border-box !important;
     min-height: 2.5rem !important;
@@ -232,4 +236,16 @@ $error-page-brand-blue: #0f295e;
 .app-dark .error-page-card .p-button.p-button-text,
 .app-dark .error-page-card .p-button.p-button-text .p-button-label {
     color: #4b5563 !important;
+}
+
+.text-muted-color {
+    color: var(--p-text-muted-color, rgb(100 116 139));
+}
+
+.text-right-input.p-inputtext,
+.text-right-input.p-inputnumber-input,
+.p-inputnumber.text-right-input .p-inputnumber-input,
+.input-field-wrap .text-right-input.p-inputtext,
+.input-field-wrap .p-inputnumber.text-right-input .p-inputnumber-input {
+    text-align: right;
 }

@@ -37,11 +37,21 @@ export default [
         })
     },
     {
+        path: '/attendance/:companyUuid/id',
+        name: 'StudentAttendanceById',
+        component: () => import('@/views/kiosk/AttendanceKiosk.vue'),
+        meta: {
+            public: true,
+            kioskMode: 'id'
+        }
+    },
+    {
         path: '/attendance/:companyUuid',
         name: 'StudentAttendance',
         component: () => import('@/views/kiosk/AttendanceKiosk.vue'),
         meta: {
-            public: true
+            public: true,
+            kioskMode: 'card'
         }
     },
     {

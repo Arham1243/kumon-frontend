@@ -35,7 +35,7 @@ async function getItems() {
         };
         if (!payload.sort || payload.sort.length === 0) {
             payload.sort = [
-                { field: 'system', direction: 'desc' },
+                { field: 'status', direction: 'desc' },
                 { field: 'name', direction: 'asc' }
             ];
         }
@@ -58,7 +58,7 @@ const columnsMenuItems = [
         field: 'status',
         header: 'Status',
         sortable: true,
-        filter: { ...ROLE_STATUS_FILTER, defaultActive: false }
+        filter: { ...ROLE_STATUS_FILTER, defaultValue: true }
     }
 ];
 
@@ -68,7 +68,6 @@ const { primeFilters, onColumnFilter } = useTableColumnFilters({
     pagination,
     refetch: getItems
 });
-const deleteDialog = ref(false);
 const selectedItem = ref(null);
 const changeStatusDialog = ref(false);
 const showDialog = ref(false);
@@ -88,7 +87,6 @@ const menuItems = computed(() => {
     if (!selectedItem.value) return [];
 
     const isSystem = selectedItem.value?.system;
-    const canShowDelete = !isSystem;
 
     const allMenuItems = [
         !isSystem && {
@@ -117,21 +115,11 @@ const menuItems = computed(() => {
                 icon: 'pi pi-check',
                 permission: 'administration.user-roles.edit',
                 command: () => showChangeStatusDialog()
-            },
-        canShowDelete && {
-            label: 'Delete',
-            icon: 'pi pi-trash',
-            permission: 'administration.user-roles.delete',
-            command: () => showDeleteDialog()
-        }
+            }
     ].filter(Boolean);
 
     return helpers.filterByPermission(allMenuItems);
 });
-
-const showDeleteDialog = () => {
-    deleteDialog.value = true;
-};
 
 const isItemActive = computed(() => {
     return selectedItem.value && selectedItem.value.status;
@@ -255,19 +243,6 @@ const save = async () => {
     }
 };
 
-const deleteItem = async () => {
-    try {
-        loading.value = true;
-        if (selectedItem.value) {
-            await roleStore.deleteItem(selectedItem.value.uuid);
-        }
-        await getItems();
-        selectedItem.value = {};
-    } finally {
-        loading.value = false;
-    }
-};
-
 const changeStatus = async () => {
     try {
         loading.value = true;
@@ -362,10 +337,7 @@ const changeStatus = async () => {
                 </Column>
 
                 <Column
-                    v-if="
-                        $ability.can('administration.user-roles.edit') ||
-                        $ability.can('administration.user-roles.delete')
-                    "
+                    v-if="$ability.can('administration.user-roles.edit')"
                     columnKey="actions"
                     header="Actions"
                     class="flex justify-end"
@@ -470,16 +442,4 @@ const changeStatus = async () => {
         @confirm="changeStatus"
     />
 
-    <Confirmation
-        v-model="deleteDialog"
-        variant="danger"
-        header="Delete Role"
-        :content="
-            selectedItem
-                ? `Delete role \u201C${selectedItem.name}\u201D? Roles assigned to admins or tenant users cannot be deleted.`
-                : 'Delete this role?'
-        "
-        confirm-button-text="Delete"
-        @confirm="deleteItem"
-    />
 </template>

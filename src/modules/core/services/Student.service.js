@@ -2,6 +2,10 @@ import AxiosService from '@/services/Axios.service';
 
 const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
+export const nextStudentId = () => {
+    return AxiosService.get(`${BASE_URL}/students/next-id`);
+};
+
 export const search = (payload, params) => {
     return AxiosService.post(`${BASE_URL}/students/search`, payload, {
         params
@@ -16,14 +20,13 @@ export const update = (id, payload) => {
     return AxiosService.put(`${BASE_URL}/students/${id}`, payload);
 };
 
-export const deleteItem = (id) => {
-    return AxiosService.delete(`${BASE_URL}/students/${id}/delete`);
+export const changeStatus = (id, payload) => {
+    return AxiosService.post(
+        `${BASE_URL}/students/${id}/change-status`,
+        payload
+    );
 };
 
-export const searchCardHistory = (studentUuid, payload, params) => {
-    return AxiosService.post(
-        `${BASE_URL}/students/${studentUuid}/card-histories/search`,
-        payload,
-        { params }
-    );
+export const deleteItem = (id) => {
+    return AxiosService.delete(`${BASE_URL}/students/${id}/delete`);
 };

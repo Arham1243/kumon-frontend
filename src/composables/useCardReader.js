@@ -1,4 +1,4 @@
-import { onBeforeUnmount, ref, shallowRef } from 'vue';
+import { onBeforeUnmount, ref, unref, watch } from 'vue';
 
 const DEFAULT_WS_URL = 'ws://127.0.0.1:8765';
 const INITIAL_RECONNECT_MS = 2000;
@@ -19,8 +19,16 @@ function normalizeUid(uid) {
     return s.toUpperCase();
 }
 
+function resolveEnabled(enabled) {
+    if (enabled === undefined || enabled === null) {
+        return true;
+    }
+    return Boolean(unref(enabled));
+}
+
 export function useCardReader(options = {}) {
     const wsUrl = options.wsUrl ?? DEFAULT_WS_URL;
+    const enabledOption = options.enabled;
 
     const status = ref('connecting');
     const readerStatus = ref('disconnected');
@@ -67,7 +75,7 @@ export function useCardReader(options = {}) {
     }
 
     function scheduleReconnect() {
-        if (intentionalClose || desktopUnsubscribe) {
+        if (!resolveEnabled(enabledOption) || intentionalClose || desktopUnsubscribe) {
             return;
         }
         status.value = 'disconnected';
@@ -82,7 +90,7 @@ export function useCardReader(options = {}) {
     }
 
     function connectWebSocket() {
-        if (intentionalClose) {
+        if (!resolveEnabled(enabledOption) || intentionalClose) {
             return;
         }
 
@@ -132,6 +140,9 @@ export function useCardReader(options = {}) {
     }
 
     function connect() {
+        if (!resolveEnabled(enabledOption)) {
+            return;
+        }
         intentionalClose = false;
         if (connectDesktopBridge()) {
             return;
@@ -171,7 +182,21 @@ export function useCardReader(options = {}) {
         };
     }
 
-    connect();
+    if (enabledOption !== undefined && enabledOption !== null && typeof enabledOption === 'object') {
+        watch(
+            () => resolveEnabled(enabledOption),
+            (active) => {
+                if (active) {
+                    connect();
+                } else {
+                    disconnect();
+                }
+            },
+            { immediate: true }
+        );
+    } else if (resolveEnabled(enabledOption)) {
+        connect();
+    }
 
     onBeforeUnmount(() => {
         disconnect();

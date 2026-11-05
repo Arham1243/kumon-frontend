@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import dayjs from '@/plugins/dayjs';
 import {
@@ -12,10 +12,17 @@ import {
 } from '@/modules/core/services/Kiosk.service';
 import { useCardReader } from '@/composables';
 import Loader from '@/components/common/Loader.vue';
+import KioskCelebration from '@/views/kiosk/KioskCelebration.vue';
 
 const route = useRoute();
 
 const companyUuid = computed(() => String(route.params.companyUuid ?? ''));
+
+const kioskMode = computed(() =>
+    route.meta.kioskMode === 'id' ? 'id' : 'card'
+);
+const isCardMode = computed(() => kioskMode.value === 'card');
+const isIdMode = computed(() => kioskMode.value === 'id');
 
 const loading = ref(true);
 const loadFailure = ref(null);
@@ -27,8 +34,8 @@ const statusMessage = ref('');
 const statusTone = ref('notice');
 const statusVisible = ref(false);
 const successCheckVisible = ref(false);
-const successLabel = ref('');
 const successStudentName = ref('');
+const successMode = ref('in');
 const successFlashKey = ref(0);
 let statusTimer = null;
 let successCheckTimer = null;
@@ -86,7 +93,7 @@ const STATUS_MESSAGES = {
     rate_limited: 'Too many attempts. Please wait a moment.'
 };
 
-const { readerStatus, onCard } = useCardReader();
+const { readerStatus, onCard } = useCardReader({ enabled: isCardMode });
 
 const readerConnected = computed(
     () => readerStatus.value === 'connected'
@@ -120,8 +127,7 @@ function resolveStatusTone(code) {
 
 function showSuccessCheck(code, studentName, displayMs = 2000) {
     successStudentName.value = String(studentName ?? '').trim();
-    successLabel.value =
-        code === 'checked_out' ? 'Checked out' : 'Checked in';
+    successMode.value = code === 'checked_out' ? 'out' : 'in';
     successFlashKey.value += 1;
     successCheckVisible.value = true;
     if (successCheckTimer) {
@@ -129,7 +135,9 @@ function showSuccessCheck(code, studentName, displayMs = 2000) {
     }
     successCheckTimer = setTimeout(async () => {
         successCheckVisible.value = false;
-        await focusInput();
+        if (isIdMode.value) {
+            await focusInput();
+        }
     }, displayMs);
 }
 
@@ -184,7 +192,7 @@ async function loadCompany() {
         company.value = null;
     } finally {
         loading.value = false;
-        if (!loadFailure.value) {
+        if (!loadFailure.value && isIdMode.value) {
             await focusInput();
         }
     }
@@ -238,7 +246,9 @@ async function submitPunch() {
         handlePunchError(err);
     } finally {
         busy.value = false;
-        await focusInput();
+        if (isIdMode.value) {
+            await focusInput();
+        }
     }
 }
 
@@ -257,17 +267,26 @@ async function submitCardPunch(uid) {
         handlePunchError(err);
     } finally {
         busy.value = false;
-        await focusInput();
     }
 }
 
 let unsubscribeCard = null;
 
-onMounted(() => {
-    unsubscribeCard = onCard(({ uid }) => {
-        submitCardPunch(uid);
-    });
-});
+watch(
+    isCardMode,
+    (card) => {
+        if (typeof unsubscribeCard === 'function') {
+            unsubscribeCard();
+            unsubscribeCard = null;
+        }
+        if (card) {
+            unsubscribeCard = onCard(({ uid }) => {
+                submitCardPunch(uid);
+            });
+        }
+    },
+    { immediate: true }
+);
 
 function onInputBlur() {
     // Phone and iPad numeric keyboards often close on Go instead of sending Enter.
@@ -372,9 +391,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+    <Teleport to="body">
+        <KioskCelebration
+            v-if="successCheckVisible"
+            :name="successStudentName"
+            :mode="successMode"
+            :flash-key="successFlashKey"
+        />
+    </Teleport>
     <div class="kiosk-page">
         <div
-            v-if="company && !loadFailure"
+            v-if="isCardMode && company && !loadFailure"
             class="kiosk-page__reader"
             :class="{
                 'kiosk-page__reader--connected': readerConnected,
@@ -418,6 +445,7 @@ onBeforeUnmount(() => {
             </div>
 
             <form
+                v-if="isIdMode"
                 class="kiosk-page__center"
                 novalidate
                 @submit.prevent="submitPunch"
@@ -456,54 +484,6 @@ onBeforeUnmount(() => {
                 </button>
                 <div class="kiosk-page__message-slot" aria-live="polite">
                     <p
-                        v-show="showIdleHint"
-                        class="kiosk-page__hint"
-                    >
-                        Enter your Student ID or tap your card on the reader.
-                    </p>
-                    <Transition name="kiosk-success-banner">
-                        <div
-                            v-if="successCheckVisible"
-                            :key="successFlashKey"
-                            class="kiosk-page__success-banner"
-                            :aria-label="
-                                successStudentName
-                                    ? `${successStudentName} ${successLabel}`
-                                    : successLabel
-                            "
-                        >
-                            <p
-                                v-if="successStudentName"
-                                class="kiosk-page__student-name"
-                            >
-                                {{ successStudentName }}
-                            </p>
-                            <div class="kiosk-page__success-status">
-                                <div class="kiosk-checkmark-circle">
-                                    <svg
-                                        viewBox="0 0 52 52"
-                                        class="kiosk-checkmark-svg"
-                                    >
-                                        <circle
-                                            class="kiosk-checkmark-fill"
-                                            cx="26"
-                                            cy="26"
-                                            r="24"
-                                        />
-                                        <path
-                                            class="kiosk-checkmark-path"
-                                            fill="none"
-                                            d="M14 27l7.8 7.8L38 17"
-                                        />
-                                    </svg>
-                                </div>
-                                <p class="kiosk-page__success-label">
-                                    {{ successLabel }}
-                                </p>
-                            </div>
-                        </div>
-                    </Transition>
-                    <p
                         class="kiosk-page__status"
                         :class="[
                             `kiosk-page__status--${statusTone}`,
@@ -517,6 +497,25 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
             </form>
+            <div v-else class="kiosk-page__center">
+                <div class="kiosk-page__message-slot" aria-live="polite">
+                    <p v-show="showIdleHint" class="kiosk-page__hint">
+                        Tap your card on the reader.
+                    </p>
+                    <p
+                        class="kiosk-page__status"
+                        :class="[
+                            `kiosk-page__status--${statusTone}`,
+                            {
+                                'kiosk-page__status--visible':
+                                    statusVisible && !successCheckVisible
+                            }
+                        ]"
+                    >
+                        {{ statusMessage }}
+                    </p>
+                </div>
+            </div>
         </template>
         <div
             v-else
@@ -646,104 +645,6 @@ onBeforeUnmount(() => {
     text-align: center;
     text-wrap: balance;
     box-sizing: border-box;
-}
-
-.kiosk-page__success-banner {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    gap: clamp(0.65rem, 2.5vw, 1rem);
-    width: 100%;
-    margin: 0;
-    padding: 0 0.5rem;
-    box-sizing: border-box;
-}
-
-.kiosk-page__student-name {
-    margin: 0;
-    color: #4a2c7a;
-    font-size: clamp(1.5rem, 6.5vw, 2.75rem);
-    font-weight: 800;
-    line-height: 1.15;
-    text-align: center;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    max-width: 36rem;
-}
-
-.kiosk-page__success-status {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(0.75rem, 4vw, 1.25rem);
-}
-
-.kiosk-page__success-label {
-    margin: 0;
-    color: #4a2c7a;
-    font-size: clamp(1.75rem, 6.5vw, 2.125rem);
-    font-weight: 700;
-    line-height: 1.2;
-    text-align: left;
-}
-
-.kiosk-checkmark-circle {
-    flex-shrink: 0;
-    width: clamp(2.35rem, 10vw, 2.85rem);
-    height: clamp(2.35rem, 10vw, 2.85rem);
-}
-
-.kiosk-checkmark-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.kiosk-checkmark-fill {
-    fill: #28b856;
-    transform-origin: 26px 26px;
-    transform: scale(0.55);
-    opacity: 0;
-    animation: kiosk-check-pop 0.28s ease-out forwards;
-}
-
-.kiosk-checkmark-path {
-    stroke: #ffffff;
-    stroke-width: 3.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-dasharray: 34;
-    stroke-dashoffset: 34;
-    animation: kiosk-check-draw 0.3s ease-out 0.22s forwards;
-}
-
-@keyframes kiosk-check-pop {
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-@keyframes kiosk-check-draw {
-    to {
-        stroke-dashoffset: 0;
-    }
-}
-
-.kiosk-success-banner-enter-active,
-.kiosk-success-banner-leave-active {
-    transition: opacity 0.2s ease;
-}
-
-.kiosk-success-banner-enter-from,
-.kiosk-success-banner-leave-to {
-    opacity: 0;
 }
 
 .kiosk-page__message {

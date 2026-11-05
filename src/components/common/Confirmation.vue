@@ -12,7 +12,8 @@ const props = defineProps({
     /** When true, confirm action is in progress (blocks dismiss / shows spinner). */
     loading: { type: Boolean, default: false },
     /** When false, the dialog stays open after Confirm until the parent closes v-model. */
-    closeOnConfirm: { type: Boolean, default: true }
+    closeOnConfirm: { type: Boolean, default: true },
+    confirmDisabled: { type: Boolean, default: false }
 });
 
 const emit = defineEmits(['confirm', 'update:modelValue', 'cancel']);
@@ -36,7 +37,7 @@ const currentVariant = computed(() => {
 });
 
 const confirm = () => {
-    if (props.loading) return;
+    if (props.loading || props.confirmDisabled) return;
     emit('confirm');
     if (props.closeOnConfirm) {
         dialog.value = false;
@@ -80,6 +81,8 @@ const cancel = () => {
             <p class="text-gray-700 dark:text-gray-200 mb-0">{{ content }}</p>
         </div>
 
+        <slot />
+
         <template #footer>
             <Button
                 text
@@ -92,7 +95,7 @@ const cancel = () => {
             <Button
                 :label="confirmButtonText"
                 :loading="loading"
-                :disabled="loading"
+                :disabled="loading || confirmDisabled"
                 @click="confirm"
                 :severity="currentVariant.severity"
             />

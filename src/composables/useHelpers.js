@@ -100,6 +100,30 @@ export const useHelpers = () => {
         return parts.join(' ');
     }
 
+    const moneyFormatter = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 6
+    });
+
+    function formatMoney(value) {
+        if (value == null || value === '') {
+            return '-';
+        }
+        const amount = Number(value);
+        if (!Number.isFinite(amount)) {
+            return '-';
+        }
+
+        return moneyFormatter.format(amount);
+    }
+
+    /** InputNumber prefix with trailing space (e.g. `$ 0.00`). */
+    function currencyInputPrefix() {
+        return '$ ';
+    }
+
     /** Mailgun ids: `<local@host>` → show `local` only */
     function formatMailgunMessageIdForDisplay(raw) {
         if (raw == null || String(raw).trim() === '') return '-';
@@ -119,6 +143,8 @@ export const useHelpers = () => {
         filterByPermission,
         makeSlugToTitleCase,
         formatMailgunMessageIdForDisplay,
-        formatDurationSeconds
+        formatDurationSeconds,
+        formatMoney,
+        currencyInputPrefix
     };
 };

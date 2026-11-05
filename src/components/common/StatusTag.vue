@@ -65,6 +65,16 @@ const tagProps = computed(() => {
             return { value, severity: 'danger' };
         case 'temporary_failed':
             return { value, severity: 'warn' };
+        case 'maths':
+            return {
+                value,
+                class: '!bg-violet-100 !text-violet-900 dark:!bg-violet-950 dark:!text-violet-100'
+            };
+        case 'reading':
+            return {
+                value,
+                class: '!bg-sky-100 !text-sky-900 dark:!bg-sky-950 dark:!text-sky-100'
+            };
         default:
             return { value, severity: 'contrast' };
     }
