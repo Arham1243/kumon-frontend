@@ -4,6 +4,7 @@ export const auditLogResources = [
     { id: 'Role', name: 'Role' },
     { id: 'Scheduled Job', name: 'Scheduled Job' },
     { id: 'Email Template', name: 'Email Template' },
+    { id: 'Company', name: 'Company' },
     { id: 'Student', name: 'Student' }
 ];
 
