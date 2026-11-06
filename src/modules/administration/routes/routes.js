@@ -104,7 +104,10 @@ export default [
                 { label: 'Email Templates', route: '/email-templates' },
                 { label: 'Edit template' }
             ],
-            permission: 'administration.email-templates.edit'
+            permission: [
+                'administration.email-templates.view',
+                'administration.email-templates.edit'
+            ]
         }
     }
 ];

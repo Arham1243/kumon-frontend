@@ -27,6 +27,14 @@ export default [
                     breadcrumb: [{ label: 'My Profile' }]
                 }
             },
+            {
+                path: 'change-password',
+                name: 'ChangePassword',
+                component: () => import('@/views/profile/ChangePassword.vue'),
+                meta: {
+                    breadcrumb: [{ label: 'Change Password' }]
+                }
+            },
             ...moduleRoutes
         ]
     },

@@ -50,6 +50,17 @@ export const useAuthStore = defineStore('AuthStore', () => {
         });
     };
 
+    const changePassword = (payload) => {
+        return globalStore.actionWrapper(async () => {
+            const res = await AuthService.changePassword(payload);
+            globalStore.showSuccess(
+                'Password changed successfully',
+                'Your password has been changed successfully'
+            );
+            return res.data;
+        });
+    };
+
     const setupPassword = (payload) => {
         return globalStore.actionWrapper(async () => {
             const res = await AuthService.setupPassword(payload);
@@ -101,6 +112,7 @@ export const useAuthStore = defineStore('AuthStore', () => {
         logout,
         forgotPassword,
         resetPassword,
+        changePassword,
         setupPassword,
         verifyOtp,
         resendOtp

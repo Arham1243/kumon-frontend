@@ -113,6 +113,13 @@ async function getItems() {
                 { field: 'name', direction: 'asc' }
             ];
         }
+        const baseFilters = [...(payload.filters || [])].filter(
+            (f) => f.field !== 'is_system'
+        );
+        payload.filters = [
+            ...baseFilters,
+            { field: 'is_system', operator: '=', value: false }
+        ];
         const res = await templateStore.search(payload, params);
         items.value = res.data;
         totalRecords.value = res.meta?.total ?? 0;
@@ -181,6 +188,18 @@ const changeStatus = async () => {
                     <router-link
                         v-if="
                             ability.can('administration.email-templates.edit')
+                        "
+                        :to="{
+                            name: 'EditEmailTemplate',
+                            params: { uuid: data.uuid }
+                        }"
+                        class="text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
+                    >
+                        {{ data.name }}
+                    </router-link>
+                    <router-link
+                        v-else-if="
+                            ability.can('administration.email-templates.view')
                         "
                         :to="{
                             name: 'EditEmailTemplate',

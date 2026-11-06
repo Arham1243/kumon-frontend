@@ -29,6 +29,11 @@ const goToProfile = () => {
     router.push({ name: 'Profile' });
 };
 
+const goToChangePassword = () => {
+    layoutState.profileSidebarVisible = false;
+    router.push({ name: 'ChangePassword' });
+};
+
 const pushRoute = (name) => {
     router.push({ name });
 };
@@ -70,6 +75,18 @@ const pushRoute = (name) => {
                         </span>
                         <div class="ml-4">
                             <span class="mb-2 font-semibold">My Profile</span>
+                        </div>
+                    </a>
+                </li>
+                <li @click="goToChangePassword">
+                    <a
+                        class="cursor-pointer flex mb-4 py-3 px-4 items-center border border-surface-200 dark:border-surface-700 rounded hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors duration-150"
+                    >
+                        <span>
+                            <i class="pi pi-lock text-xl text-primary"></i>
+                        </span>
+                        <div class="ml-4">
+                            <span class="mb-2 font-semibold">Change Password</span>
                         </div>
                     </a>
                 </li>

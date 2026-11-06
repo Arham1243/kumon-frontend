@@ -5,6 +5,7 @@ import { useGlobalStore } from '@/stores';
 import { useEmailTemplateStore } from '@/modules/administration/stores';
 import { useFormDirty } from '@/composables/useFormDirty';
 import { ability } from '@/plugins/ability';
+import { SYSTEM_MANAGED_LOCK_TOOLTIP } from '@/config';
 import BoldOnlyQuillEditor from '@/modules/administration/components/email-template/BoldOnlyQuillEditor.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
 
@@ -20,7 +21,7 @@ const PLACEHOLDER_EXPIRES_IN_MINUTES = '{{expires_in_minutes}}';
 const PLACEHOLDER_ATTENDANCE_TABLE = '{{attendance_table}}';
 
 /** Must match {@see App\Models\Admin\AdminEmailTemplate::DEFAULT_COPYRIGHT_LINE} */
-const DEFAULT_COPYRIGHT_LINE = '© {{year}} Kumon. All rights reserved.';
+const DEFAULT_COPYRIGHT_LINE = '© {{year}} Intelygic. All rights reserved.';
 
 const route = useRoute();
 const router = useRouter();
@@ -95,6 +96,8 @@ const formData = ref({
 
 const { isDirty, resetDirty } = useFormDirty(formData);
 
+const isReadOnly = computed(() => isSystem.value);
+
 const showUnsavedDialog = ref(false);
 const showSendTestDialog = ref(false);
 const sendTestFormData = ref({ recipient_email: '' });
@@ -105,16 +108,32 @@ const usesBodyHtmlEditor = computed(
     () => templateSlug.value === SLUG_OPEN_ATTENDANCE_REMINDER
 );
 
+const showBodyHtmlEditor = computed(
+    () =>
+        usesBodyHtmlEditor.value ||
+        templateSlug.value === SLUG_LOGIN_OTP ||
+        templateSlug.value === SLUG_RESET_PASSWORD ||
+        templateSlug.value === SLUG_SETUP_PASSWORD ||
+        !isReadOnly.value
+);
+
 const supportedVariables = computed(() => {
     const slug = templateSlug.value;
     let greeting = [];
     let body = [];
     if (slug === SLUG_LOGIN_OTP) {
-        greeting = [PLACEHOLDER_NAME];
-        body = [PLACEHOLDER_EXPIRES_IN_MINUTES];
+        greeting = [];
+        body = [PLACEHOLDER_EXPIRES_IN_MINUTES, '{{otp_code}}'];
     } else if (slug === SLUG_RESET_PASSWORD || slug === SLUG_SETUP_PASSWORD) {
-        greeting = [PLACEHOLDER_NAME];
-        body = [PLACEHOLDER_VERIFY_LINK];
+        greeting = slug === SLUG_RESET_PASSWORD ? [] : [PLACEHOLDER_NAME];
+        body =
+            slug === SLUG_RESET_PASSWORD
+                ? [
+                      PLACEHOLDER_VERIFY_LINK,
+                      PLACEHOLDER_EXPIRES_IN_MINUTES,
+                      '{{cta_button}}'
+                  ]
+                : [PLACEHOLDER_VERIFY_LINK];
     } else if (slug === SLUG_OPEN_ATTENDANCE_REMINDER) {
         greeting = [PLACEHOLDER_NAME];
         body = [PLACEHOLDER_ATTENDANCE_TABLE];
@@ -199,15 +218,12 @@ async function getItem() {
 }
 
 function previewPayload() {
-    const payload = {
+    return {
         footer_html: formData.value.footer_html,
         subject_template: formData.value.subject_template,
-        intro_html: formData.value.intro_html
+        intro_html: formData.value.intro_html,
+        body_html: formData.value.body_html
     };
-    if (usesBodyHtmlEditor.value) {
-        payload.body_html = formData.value.body_html;
-    }
-    return payload;
 }
 
 async function updatePreview() {
@@ -354,6 +370,12 @@ async function save() {
                         <h1 class="text-2xl sm:text-3xl font-bold truncate">
                             {{ loadedName || 'Email template' }}
                         </h1>
+                        <i
+                            v-if="isSystem"
+                            class="pi pi-lock text-red-500 !text-xl opacity-90 shrink-0"
+                            aria-hidden="true"
+                            v-tooltip.top="SYSTEM_MANAGED_LOCK_TOOLTIP"
+                        />
                     </div>
                 </div>
             </template>
@@ -367,13 +389,17 @@ async function save() {
                     @click="openSendTestDialog"
                 />
                 <Button
+                    v-if="!isReadOnly"
                     label="Cancel"
                     variant="outlined"
                     @click="cancel"
                     :disabled="!isDirty || busy"
                 />
                 <Button
-                    v-if="ability.can('administration.email-templates.edit')"
+                    v-if="
+                        ability.can('administration.email-templates.edit') &&
+                        !isReadOnly
+                    "
                     :disabled="!isDirty || busy"
                     label="Save"
                     icon="pi pi-check"
@@ -397,7 +423,7 @@ async function save() {
                                         inputId="status"
                                         v-model="formData.status"
                                         size="large"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                     <label
                                         for="status"
@@ -422,7 +448,7 @@ async function save() {
                                         id="name"
                                         v-model="formData.name"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                 </div>
 
@@ -435,7 +461,7 @@ async function save() {
                                         id="from"
                                         v-model="formData.from"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                     <small
                                         class="text-gray-500 block mt-2.5 mb-1 text-sm"
@@ -455,7 +481,7 @@ async function save() {
                                         id="display_name"
                                         v-model="formData.display_name"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                 </div>
 
@@ -468,7 +494,7 @@ async function save() {
                                         id="reply_to_email"
                                         v-model="formData.reply_to_email"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                 </div>
 
@@ -482,7 +508,7 @@ async function save() {
                                         id="reply_to_name"
                                         v-model="formData.reply_to_name"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                     />
                                 </div>
 
@@ -493,7 +519,7 @@ async function save() {
                                     <BccRecipientsField
                                         id="bcc_recipients"
                                         v-model="formData.bcc_recipients"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                         placeholder="Add recipients"
                                     />
                                 </div>
@@ -507,7 +533,7 @@ async function save() {
                                         id="subject_template"
                                         v-model="formData.subject_template"
                                         class="w-full"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                         @input="debouncedPreview"
                                     />
                                     <div
@@ -531,20 +557,22 @@ async function save() {
                                     </div>
                                 </div>
 
-                                <div class="col-span-12">
+                                <div
+                                    v-if="
+                                        templateSlug !== SLUG_LOGIN_OTP &&
+                                        templateSlug !== SLUG_RESET_PASSWORD
+                                    "
+                                    class="col-span-12"
+                                >
                                     <label
                                         class="block mb-3"
                                         for="intro_html_editor"
-                                        >{{
-                                            usesBodyHtmlEditor
-                                                ? 'Greeting'
-                                                : 'Body'
-                                        }}</label
+                                        >Greeting</label
                                     >
                                     <BoldOnlyQuillEditor
                                         id="intro_html_editor"
                                         v-model="formData.intro_html"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                         preserve-html
                                         min-height="160px"
                                         @update:model-value="debouncedPreview"
@@ -572,10 +600,7 @@ async function save() {
                                     </div>
                                 </div>
 
-                                <div
-                                    v-if="usesBodyHtmlEditor"
-                                    class="col-span-12"
-                                >
+                                <div v-if="showBodyHtmlEditor" class="col-span-12">
                                     <label
                                         class="block mb-3"
                                         for="body_html_editor"
@@ -584,12 +609,13 @@ async function save() {
                                     <BoldOnlyQuillEditor
                                         id="body_html_editor"
                                         v-model="formData.body_html"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                         preserve-html
                                         min-height="220px"
                                         @update:model-value="debouncedPreview"
                                     />
                                     <p
+                                        v-if="usesBodyHtmlEditor"
                                         class="mt-2 text-sm text-surface-600 dark:text-surface-400"
                                     >
                                         Include
@@ -626,7 +652,7 @@ async function save() {
                                         variant="text"
                                         id="footer_html"
                                         v-model="formData.footer_html"
-                                        :disabled="busy"
+                                        :disabled="busy || isReadOnly"
                                         class="w-full"
                                         @input="debouncedPreview"
                                     />

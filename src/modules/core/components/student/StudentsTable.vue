@@ -712,7 +712,7 @@ const changeStatus = async () => {
                                 class="datatable-column-header-text mb-2 block"
                                 for="student_filter_date_range"
                             >
-                                Date range
+                                Date Range
                             </label>
                             <InputField
                                 id="student_filter_date_range"

@@ -29,6 +29,10 @@ export const updateUiPreferences = (payload) => {
     return AxiosService.patch(`${AUTH_BASE_URL}/ui-preferences`, payload);
 };
 
+export const changePassword = (payload) => {
+    return AxiosService.put(`${AUTH_BASE_URL}/password`, payload);
+};
+
 export const getTablePreferences = (params) => {
     return AxiosService.get(`${AUTH_BASE_URL}/table-preferences`, { params });
 };
