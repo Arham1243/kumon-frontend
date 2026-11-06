@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeMount, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useStudentStore } from '@/modules/core/stores';
 import { useGlobalStore } from '@/stores';
 import { useFormDirty } from '@/composables/useFormDirty';
@@ -54,6 +54,10 @@ const deactivateEndDate = ref(null);
 
 const showAssignCardDialog = ref(false);
 const cardAssignBusy = ref(false);
+
+const showUnsavedDialog = ref(false);
+const pendingLeaveTo = ref(null);
+const bypassLeaveGuard = ref(false);
 
 const assignCardStubForm = ref({ _assignCard: true });
 
@@ -223,6 +227,37 @@ watch(
         await getItem();
     }
 );
+
+onBeforeRouteLeave((to) => {
+    if (bypassLeaveGuard.value) {
+        bypassLeaveGuard.value = false;
+        return true;
+    }
+    if (!isDirty.value || busy.value) {
+        return true;
+    }
+    pendingLeaveTo.value = to;
+    showUnsavedDialog.value = true;
+    return false;
+});
+
+function confirmLeave() {
+    showUnsavedDialog.value = false;
+    const destination = pendingLeaveTo.value;
+    pendingLeaveTo.value = null;
+    if (!destination) {
+        return;
+    }
+    mapRecordToForm(studentRecord.value);
+    resetDirty(formData.value);
+    bypassLeaveGuard.value = true;
+    router.push(destination);
+}
+
+function cancelLeave() {
+    showUnsavedDialog.value = false;
+    pendingLeaveTo.value = null;
+}
 
 function buildPayload() {
     const fee = formData.value.tuition_fee;
@@ -667,6 +702,17 @@ function goBackFromNotFound() {
                 />
             </template>
         </BaseDialog>
+
+        <Confirmation
+            v-model="showUnsavedDialog"
+            header="Unsaved Changes"
+            content="You have unsaved changes. If you close, those changes will be lost. Do you want to discard them?"
+            variant="danger"
+            confirmButtonText="Discard Changes"
+            cancelButtonText="Keep Editing"
+            @confirm="confirmLeave"
+            @cancel="cancelLeave"
+        />
 
         <Confirmation
             v-model="changeStatusDialog"

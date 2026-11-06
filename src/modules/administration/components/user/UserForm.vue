@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onBeforeMount, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import {
     useUserStore,
     useUserRoleStore
@@ -10,6 +10,7 @@ import PlaceholderImage from '@/assets/images/image_not_available.png';
 import StatusTag from '@/components/common/StatusTag.vue';
 import ToggleSwitch from 'primevue/toggleswitch';
 import useEventsBus from '@/composables/useEventsBus';
+import Confirmation from '@/components/common/Confirmation.vue';
 
 const props = defineProps({
     mode: { type: String, required: true }
@@ -20,6 +21,10 @@ const route = useRoute();
 const userStore = useUserStore();
 const roleStore = useUserRoleStore();
 const { emit: emitEvent } = useEventsBus();
+
+const showUnsavedDialog = ref(false);
+const pendingLeaveTo = ref(null);
+const bypassLeaveGuard = ref(false);
 
 const busy = ref(false);
 const loading = ref(props.mode === 'edit');
@@ -193,6 +198,7 @@ const save = async () => {
             resetDirty(formData.value);
         } else {
             await userStore.create(payload);
+            resetDirty(formData.value);
             router.push({ name: 'Users' });
         }
     } catch (error) {
@@ -232,6 +238,49 @@ const hasPasswordChange = computed(() => {
 const hasUnsavedChanges = computed(
     () => isDirty.value || hasPasswordChange.value
 );
+
+onBeforeRouteLeave((to) => {
+    if (bypassLeaveGuard.value) {
+        bypassLeaveGuard.value = false;
+        return true;
+    }
+    if (!hasUnsavedChanges.value || busy.value) {
+        return true;
+    }
+    pendingLeaveTo.value = to;
+    showUnsavedDialog.value = true;
+    return false;
+});
+
+async function confirmLeave() {
+    showUnsavedDialog.value = false;
+    const destination = pendingLeaveTo.value;
+    pendingLeaveTo.value = null;
+    if (!destination) {
+        return;
+    }
+    if (isEditMode.value) {
+        await getItem();
+    } else {
+        formData.value = {
+            name: '',
+            email: '',
+            password: '',
+            role_id: null,
+            status: 'active',
+            profile_image: null
+        };
+        selectedRole.value = null;
+        resetDirty(formData.value);
+    }
+    bypassLeaveGuard.value = true;
+    router.push(destination);
+}
+
+function cancelLeave() {
+    showUnsavedDialog.value = false;
+    pendingLeaveTo.value = null;
+}
 
 const canSave = computed(() => {
     if (!isEditMode.value) {
@@ -444,5 +493,16 @@ const cancelDisabled = computed(() => {
                 </div>
             </template>
         </Card>
+
+        <Confirmation
+            v-model="showUnsavedDialog"
+            header="Unsaved Changes"
+            content="You have unsaved changes. If you close, those changes will be lost. Do you want to discard them?"
+            variant="danger"
+            confirmButtonText="Discard Changes"
+            cancelButtonText="Keep Editing"
+            @confirm="confirmLeave"
+            @cancel="cancelLeave"
+        />
     </template>
 </template>
