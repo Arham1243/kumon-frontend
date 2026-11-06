@@ -166,11 +166,11 @@ function mergeDateRangeIntoPayload(payload) {
 
     const field =
         studentDateRangeMode.value === 'end_date' ? 'end_date' : 'start_date';
-    next.filters.push({
-        field,
-        operator: 'between',
-        value: [...appliedDateRange.value]
-    });
+    const [from, to] = appliedDateRange.value;
+    next.filters.push(
+        { field, operator: '>=', value: from },
+        { field, operator: '<=', value: to }
+    );
     return next;
 }
 
@@ -587,15 +587,15 @@ const changeStatus = async () => {
 <template>
     <div class="mb-7 w-full min-w-0">
         <div
-            class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-3 gap-y-2 overflow-x-auto pb-0.5 sm:gap-x-4"
+            class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-2 pb-0.5 sm:gap-x-3"
         >
             <div
-                class="col-start-1 flex min-w-0 flex-wrap items-end gap-x-3 gap-y-2 sm:gap-x-4"
+                class="col-start-1 flex min-w-0 flex-nowrap items-center justify-self-start gap-x-2 sm:gap-x-3"
             >
-                <h1 class="shrink-0 text-2xl font-bold sm:text-3xl">
+                <h1 class="shrink-0 text-xl font-bold leading-none sm:text-2xl">
                     Students
                 </h1>
-                <div class="flex shrink-0 flex-nowrap items-end gap-2">
+                <div class="flex shrink-0 flex-nowrap items-center gap-2">
                     <Button
                         type="button"
                         :severity="
@@ -698,79 +698,84 @@ const changeStatus = async () => {
                     </Button>
                 </div>
             </div>
-            <div class="col-start-2 shrink-0 justify-self-center px-1 sm:px-2">
+            <div
+                class="col-start-2 min-w-0 justify-self-center px-0.5 sm:px-1"
+            >
                 <div
-                    class="w-fit max-w-full shrink-0 rounded-xl border border-surface-200 bg-surface-0 px-3 py-3 shadow-sm dark:border-surface-600"
+                    class="flex flex-nowrap items-center gap-3 rounded-lg border border-surface-200 bg-surface-0 px-2 py-1.5 shadow-sm dark:border-surface-600 sm:gap-4 sm:px-2.5"
                 >
                     <div
-                        class="purchase-return-search__row flex w-auto max-w-full flex-nowrap items-end gap-3 overflow-x-auto sm:gap-4 min-[1100px]:gap-6"
+                        class="student-toolbar-date-range flex min-w-[18rem] max-w-[26rem] flex-1 items-center gap-1.5 sm:min-w-[20rem] sm:max-w-[28rem]"
                     >
-                        <div
-                            class="purchase-return-search__field w-[min(100%,17.5rem)] shrink-0 sm:w-[18rem]"
+                        <label
+                            class="datatable-column-header-text shrink-0 text-xs leading-none text-surface-600 dark:text-surface-400"
+                            for="student_filter_date_range"
                         >
-                            <label
-                                class="datatable-column-header-text mb-2 block"
-                                for="student_filter_date_range"
-                            >
-                                Date Range
-                            </label>
-                            <InputField
-                                id="student_filter_date_range"
-                                v-model="dateRangeForRun"
-                                variant="date"
-                                :range="true"
-                                class="w-full"
-                                :disabled="loading || loadingSummary"
-                                placeholder="Select"
-                            />
-                        </div>
-                        <div class="purchase-return-search__field shrink-0">
-                            <span class="datatable-column-header-text mb-2 block"
-                                >Filter by</span
-                            >
-                            <div class="flex flex-col gap-2">
-                                <div class="inline-flex items-center gap-2">
-                                    <RadioButton
-                                        v-model="studentDateRangeMode"
-                                        input-id="student-date-range-start"
-                                        value="start_date"
-                                        :disabled="loading || loadingSummary"
-                                    />
-                                    <label
-                                        class="cursor-pointer text-sm leading-none text-surface-800 dark:text-surface-100"
-                                        for="student-date-range-start"
-                                        >Started at</label
-                                    >
-                                </div>
-                                <div class="inline-flex items-center gap-2">
-                                    <RadioButton
-                                        v-model="studentDateRangeMode"
-                                        input-id="student-date-range-end"
-                                        value="end_date"
-                                        :disabled="loading || loadingSummary"
-                                    />
-                                    <label
-                                        class="cursor-pointer text-sm leading-none text-surface-800 dark:text-surface-100"
-                                        for="student-date-range-end"
-                                        >Left at</label
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                        <Button
-                            type="button"
-                            icon="pi pi-arrow-right"
-                            rounded
-                            class="shrink-0"
-                            aria-label="Apply date range filter"
+                            Date Range
+                        </label>
+                        <InputField
+                            id="student_filter_date_range"
+                            v-model="dateRangeForRun"
+                            variant="date"
+                            :range="true"
+                            class="min-w-0 flex-1"
                             :disabled="loading || loadingSummary"
-                            :loading="loading"
-                            @click="applyStudentDateFilter"
+                            placeholder="Select"
                         />
                     </div>
+                    <div
+                        class="ml-4 flex shrink-0 flex-nowrap items-center gap-2 sm:ml-5 sm:gap-3"
+                    >
+                        <span
+                            class="datatable-column-header-text shrink-0 text-xs font-semibold leading-none text-surface-700 dark:text-surface-200"
+                            >Filter by</span
+                        >
+                        <div
+                            class="inline-flex flex-nowrap items-center gap-2 sm:gap-3"
+                        >
+                            <div class="inline-flex items-center gap-2">
+                                <RadioButton
+                                    v-model="studentDateRangeMode"
+                                    input-id="student-date-range-start"
+                                    value="start_date"
+                                    :disabled="loading || loadingSummary"
+                                />
+                                <label
+                                    class="cursor-pointer whitespace-nowrap text-sm font-medium leading-tight text-surface-900 dark:text-surface-50"
+                                    for="student-date-range-start"
+                                    >Started at</label
+                                >
+                            </div>
+                            <div class="inline-flex items-center gap-2">
+                                <RadioButton
+                                    v-model="studentDateRangeMode"
+                                    input-id="student-date-range-end"
+                                    value="end_date"
+                                    :disabled="loading || loadingSummary"
+                                />
+                                <label
+                                    class="cursor-pointer whitespace-nowrap text-sm font-medium leading-tight text-surface-900 dark:text-surface-50"
+                                    for="student-date-range-end"
+                                    >Left at</label
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <Button
+                        type="button"
+                        icon="pi pi-arrow-right"
+                        rounded
+                        class="shrink-0"
+                        aria-label="Apply date range filter"
+                        :disabled="loading || loadingSummary"
+                        :loading="loading"
+                        @click="applyStudentDateFilter"
+                    />
                 </div>
             </div>
-            <div class="col-start-3 flex min-w-0 justify-end">
+            <div
+                class="col-start-3 flex min-w-0 justify-self-end"
+            >
                 <Button
                     v-if="$ability.can('core.students.create')"
                     label="Add New"

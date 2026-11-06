@@ -37,10 +37,10 @@ const ATT_COUNT_BADGE_BASE =
     'inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border text-center text-[9px] font-bold tabular-nums leading-none shadow-sm';
 const STATUS_COUNT_BADGE_ACTIVE_CHECKED_IN = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-emerald-900 dark:border-emerald-200/30 dark:bg-emerald-950 dark:text-emerald-50`;
 const STATUS_COUNT_BADGE_INACTIVE_CHECKED_IN = `${ATT_COUNT_BADGE_BASE} border-emerald-600/25 bg-emerald-600/25 text-emerald-950 dark:border-emerald-400/35 dark:bg-emerald-400/20 dark:text-emerald-50`;
-const STATUS_COUNT_BADGE_ACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-sky-950 dark:border-sky-200/30 dark:bg-sky-950 dark:text-sky-50`;
-const STATUS_COUNT_BADGE_INACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-sky-600/25 bg-sky-600/25 text-sky-950 dark:border-sky-400/35 dark:bg-sky-400/20 dark:text-sky-50`;
-const STATUS_COUNT_BADGE_ACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-violet-950 dark:border-violet-200/30 dark:bg-violet-950 dark:text-violet-50`;
-const STATUS_COUNT_BADGE_INACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-violet-600/25 bg-violet-600/25 text-violet-950 dark:border-violet-400/35 dark:bg-violet-400/20 dark:text-violet-50`;
+const STATUS_COUNT_BADGE_ACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-violet-950 dark:border-violet-200/30 dark:bg-violet-950 dark:text-violet-50`;
+const STATUS_COUNT_BADGE_INACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-violet-600/25 bg-violet-600/25 text-violet-950 dark:border-violet-400/35 dark:bg-violet-400/20 dark:text-violet-50`;
+const STATUS_COUNT_BADGE_ACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-rose-950 dark:border-rose-200/30 dark:bg-rose-950 dark:text-rose-50`;
+const STATUS_COUNT_BADGE_INACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-rose-600/25 bg-rose-600/25 text-rose-950 dark:border-rose-400/35 dark:bg-rose-400/20 dark:text-rose-50`;
 
 /** Same checkbox treatment as Students: white box + preset check when selected */
 const FILTER_CB_WRAP_CHECKED_IN =
@@ -54,19 +54,19 @@ const FILTER_CB_WRAP_CHECKED_IN =
 const FILTER_CB_WRAP_CHECKED_OUT =
     '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
     '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
-    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-sky-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-sky-50 ' +
-    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-sky-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-sky-950/40 ' +
-    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
-    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-sky-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-sky-800 ' +
-    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-sky-500';
-const FILTER_CB_WRAP_NOT_CHECKED_OUT =
-    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
-    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
     '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-violet-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-violet-50 ' +
     'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-violet-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-violet-950/40 ' +
     '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
     '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-violet-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-violet-800 ' +
     'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-violet-500';
+const FILTER_CB_WRAP_NOT_CHECKED_OUT =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-rose-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-rose-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-rose-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-rose-950/40 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-rose-900 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-500';
 
 function disableFutureAttendanceDate(date) {
     return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
@@ -504,7 +504,7 @@ const save = async () => {
                                 type="button"
                                 :severity="
                                     statusFilter === 'checked_out'
-                                        ? 'info'
+                                        ? 'help'
                                         : undefined
                                 "
                                 :variant="
@@ -516,7 +516,7 @@ const save = async () => {
                                     '!items-center',
                                     statusFilter === 'checked_out'
                                         ? undefined
-                                        : '!bg-sky-50 !border-sky-400 !text-sky-950 hover:!bg-sky-100 dark:!bg-sky-950/40 dark:!border-sky-500 dark:!text-sky-50'
+                                        : '!bg-violet-50 !border-violet-300 !text-violet-950 hover:!bg-violet-100 dark:!bg-violet-950/40 dark:!border-violet-500 dark:!text-violet-50'
                                 ]"
                                 :disabled="loading"
                                 :aria-pressed="statusFilter === 'checked_out'"
@@ -559,7 +559,7 @@ const save = async () => {
                                 type="button"
                                 :severity="
                                     statusFilter === 'not_checked_out'
-                                        ? 'help'
+                                        ? 'danger'
                                         : undefined
                                 "
                                 :variant="
@@ -571,7 +571,7 @@ const save = async () => {
                                     '!items-center',
                                     statusFilter === 'not_checked_out'
                                         ? undefined
-                                        : '!bg-violet-50 !border-violet-300 !text-violet-950 hover:!bg-violet-100 dark:!bg-violet-950/40 dark:!border-violet-500 dark:!text-violet-50'
+                                        : '!bg-rose-50 !border-rose-300 !text-rose-900 hover:!bg-rose-100 dark:!bg-rose-950/40 dark:!border-rose-600 dark:!text-rose-50'
                                 ]"
                                 :disabled="loading"
                                 :aria-pressed="
