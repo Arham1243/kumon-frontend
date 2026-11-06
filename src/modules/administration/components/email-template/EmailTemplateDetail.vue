@@ -2,12 +2,15 @@
 import { computed, ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGlobalStore } from '@/stores';
+import { useSessionStore } from '@/stores/Session';
 import { useEmailTemplateStore } from '@/modules/administration/stores';
+import { useCompanyStore } from '@/modules/administration/stores/Company';
 import { useFormDirty } from '@/composables/useFormDirty';
 import { ability } from '@/plugins/ability';
 import { SYSTEM_MANAGED_LOCK_TOOLTIP } from '@/config';
 import BoldOnlyQuillEditor from '@/modules/administration/components/email-template/BoldOnlyQuillEditor.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
+import BccRecipientsField from '@/components/common/BccRecipientsField.vue';
 
 const SLUG_LOGIN_OTP = 'login-otp';
 const SLUG_RESET_PASSWORD = 'reset-password';
@@ -19,6 +22,11 @@ const PLACEHOLDER_NAME = '{{name}}';
 const PLACEHOLDER_VERIFY_LINK = '{{verify_link}}';
 const PLACEHOLDER_EXPIRES_IN_MINUTES = '{{expires_in_minutes}}';
 const PLACEHOLDER_ATTENDANCE_TABLE = '{{attendance_table}}';
+const PLACEHOLDER_CHECK_IN_COUNT = '{{check_in_count}}';
+const PLACEHOLDER_CHECK_OUT_COUNT = '{{check_out_count}}';
+const PLACEHOLDER_REPORT_DATE = '{{report_date}}';
+const PLACEHOLDER_ATTENDANCE_SUMMARY_CARDS = '{{attendance_summary_cards}}';
+const PLACEHOLDER_NOT_CHECKED_OUT_COUNT = '{{not_checked_out_count}}';
 
 /** Must match {@see App\Models\Admin\AdminEmailTemplate::DEFAULT_COPYRIGHT_LINE} */
 const DEFAULT_COPYRIGHT_LINE = '© {{year}} Intelygic. All rights reserved.';
@@ -26,7 +34,12 @@ const DEFAULT_COPYRIGHT_LINE = '© {{year}} Intelygic. All rights reserved.';
 const route = useRoute();
 const router = useRouter();
 const store = useEmailTemplateStore();
+const companyStore = useCompanyStore();
 const globalStore = useGlobalStore();
+const sessionStore = useSessionStore();
+
+/** Snapshot after load; used to PATCH company only when this value changes. */
+const loadedDailySummarySendTime = ref('20:00');
 
 const busy = ref(false);
 const loading = ref(false);
@@ -43,6 +56,10 @@ const debounceTimer = ref(null);
 /** Skips editor debounced preview while the form mounts after {@link getItem}. */
 const suppressDebouncedPreview = ref(false);
 const showLivePreview = ref(true);
+
+const isAttendanceSummaryTemplate = computed(
+    () => templateSlug.value === SLUG_OPEN_ATTENDANCE_REMINDER
+);
 
 function resizePreviewFrame() {
     const iframe = previewFrame.value;
@@ -84,6 +101,7 @@ const formData = ref({
     reply_to_email: '',
     reply_to_name: '',
     bcc_recipients: [],
+    to_recipients: [],
     subject_template: '',
     intro_html: '',
     body_html: '',
@@ -91,7 +109,8 @@ const formData = ref({
     detail_row_keys: null,
     detail_row_labels: {},
     detail_row_catalog: null,
-    status: true
+    status: true,
+    daily_summary_report_send_time: '20:00'
 });
 
 const { isDirty, resetDirty } = useFormDirty(formData);
@@ -135,14 +154,21 @@ const supportedVariables = computed(() => {
                   ]
                 : [PLACEHOLDER_VERIFY_LINK];
     } else if (slug === SLUG_OPEN_ATTENDANCE_REMINDER) {
-        greeting = [PLACEHOLDER_NAME];
-        body = [PLACEHOLDER_ATTENDANCE_TABLE];
+        greeting = [];
+        body = [
+            PLACEHOLDER_CHECK_IN_COUNT,
+            PLACEHOLDER_CHECK_OUT_COUNT,
+            PLACEHOLDER_NOT_CHECKED_OUT_COUNT,
+            PLACEHOLDER_REPORT_DATE,
+            PLACEHOLDER_ATTENDANCE_SUMMARY_CARDS,
+            PLACEHOLDER_ATTENDANCE_TABLE
+        ];
     }
     return {
         greeting,
         body,
         footer: [PLACEHOLDER_YEAR],
-        subject: []
+        subject: slug === SLUG_OPEN_ATTENDANCE_REMINDER ? [PLACEHOLDER_REPORT_DATE] : []
     };
 });
 
@@ -187,6 +213,7 @@ async function getItem() {
         templateSlug.value = item.slug ?? '';
         loadedName.value = item.name ?? '';
         isSystem.value = !!item.is_system;
+        const slug = item.slug ?? '';
         formData.value = {
             name: item.name ?? '',
             subject_template: item.subject_template ?? '',
@@ -197,6 +224,9 @@ async function getItem() {
             bcc_recipients: Array.isArray(item.bcc_recipients)
                 ? item.bcc_recipients
                 : [],
+            to_recipients: Array.isArray(item.to_recipients)
+                ? item.to_recipients
+                : [],
             intro_html: item.intro_html ?? '',
             body_html: item.body_html ?? '',
             footer_html: item.footer_html?.trim()
@@ -205,8 +235,26 @@ async function getItem() {
             detail_row_keys: null,
             detail_row_labels: {},
             detail_row_catalog: null,
-            status: !!item.status
+            status: !!item.status,
+            daily_summary_report_send_time: '20:00'
         };
+        if (slug === SLUG_OPEN_ATTENDANCE_REMINDER) {
+            try {
+                const company = await companyStore.getMyCompany();
+                const t = company?.daily_summary_report_send_time ?? '20:00';
+                formData.value.daily_summary_report_send_time = t;
+                loadedDailySummarySendTime.value = t;
+                if (sessionStore.myCompany) {
+                    sessionStore.myCompany.daily_summary_report_send_time = t;
+                }
+            } catch (e) {
+                console.error(e);
+                formData.value.daily_summary_report_send_time = '20:00';
+                loadedDailySummarySendTime.value = '20:00';
+            }
+        } else {
+            loadedDailySummarySendTime.value = '20:00';
+        }
         resetDirty(formData.value);
         suppressDebouncedPreview.value = true;
         await updatePreview();
@@ -288,6 +336,12 @@ function confirmDiscard() {
 }
 
 const savePayload = computed(() => {
+    if (templateSlug.value === SLUG_OPEN_ATTENDANCE_REMINDER) {
+        return {
+            status: formData.value.status,
+            to_recipients: formData.value.to_recipients
+        };
+    }
     const p = {
         footer_html: formData.value.footer_html,
         subject_template: formData.value.subject_template,
@@ -341,6 +395,25 @@ async function save() {
     if (!templateUuid.value) return;
     try {
         busy.value = true;
+        if (templateSlug.value === SLUG_OPEN_ATTENDANCE_REMINDER) {
+            const timeChanged =
+                formData.value.daily_summary_report_send_time !==
+                loadedDailySummarySendTime.value;
+            if (timeChanged) {
+                const updated = await companyStore.saveCompany({
+                    daily_summary_report_send_time:
+                        formData.value.daily_summary_report_send_time
+                });
+                const t =
+                    updated?.daily_summary_report_send_time ??
+                    formData.value.daily_summary_report_send_time;
+                loadedDailySummarySendTime.value = t;
+                formData.value.daily_summary_report_send_time = t;
+                if (sessionStore.myCompany) {
+                    sessionStore.myCompany.daily_summary_report_send_time = t;
+                }
+            }
+        }
         await store.update(templateUuid.value, savePayload.value);
         await getItem();
     } catch (e) {
@@ -438,7 +511,48 @@ async function save() {
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-12 gap-x-6 gap-y-8">
+                            <div
+                                v-if="isAttendanceSummaryTemplate"
+                                class="grid grid-cols-12 gap-x-6 gap-y-8"
+                            >
+                                <div class="col-span-12 sm:col-span-6">
+                                    <label
+                                        class="block mb-3"
+                                        for="daily_summary_report_send_time"
+                                        >Daily Summary Report Send Time</label
+                                    >
+                                    <InputField
+                                        id="daily_summary_report_send_time"
+                                        v-model="
+                                            formData.daily_summary_report_send_time
+                                        "
+                                        variant="time"
+                                        error-key="daily_summary_report_send_time"
+                                        class="w-full"
+                                        :disabled="busy || isReadOnly"
+                                    />
+                                    <p
+                                        class="mt-3 text-sm text-gray-600 dark:text-gray-400"
+                                    >
+                                        In your Home Timezone, choose what time each day to send the Daily Summary Report.
+                                    </p>
+                                </div>
+                                <div class="col-span-12 sm:col-span-6">
+                                    <label class="block mb-3 required" for="to_recipients"
+                                        >TO</label
+                                    >
+                                    <BccRecipientsField
+                                        id="to_recipients"
+                                        v-model="formData.to_recipients"
+                                        :disabled="busy || isReadOnly"
+                                    />
+                                </div>
+                            </div>
+
+                            <div
+                                v-else
+                                class="grid grid-cols-12 gap-x-6 gap-y-8"
+                            >
                                 <div class="col-span-12 sm:col-span-6">
                                     <label class="block mb-3 required"
                                         >Template Name</label

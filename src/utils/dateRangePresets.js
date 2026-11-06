@@ -1,4 +1,5 @@
 import dayjs from '@/plugins/dayjs';
+import { COMPANY_DEFAULT_TIMEZONE } from '@/config/enums';
 
 export const PERIOD_OPTIONS = [
     { label: 'All', value: 'all' },
@@ -14,26 +15,54 @@ export const PERIOD_OPTIONS = [
     { label: 'Last Year', value: 'last_year' }
 ];
 
-export function calendarQuarterStart(input) {
-    const d = dayjs(input);
+export function calendarQuarterStart(input, timezoneId = null) {
+    const d =
+        timezoneId != null && timezoneId !== ''
+            ? dayjs(input).tz(resolveCompanyTz(timezoneId))
+            : dayjs(input);
     const m = d.month();
     const startM = Math.floor(m / 3) * 3;
     return d.month(startM).date(1).startOf('month');
 }
 
-export function calendarQuarterEnd(input) {
-    return calendarQuarterStart(input).add(2, 'month').endOf('month');
+export function calendarQuarterEnd(input, timezoneId = null) {
+    return calendarQuarterStart(input, timezoneId).add(2, 'month').endOf('month');
 }
 
-export function lastQuarterRange(now = dayjs()) {
-    const qs = calendarQuarterStart(now);
+export function lastQuarterRange(nowInput, timezoneId = null) {
+    const now = resolveNowForPresets(nowInput, timezoneId);
+    const qs = calendarQuarterStart(now, timezoneId);
     const prevEnd = qs.subtract(1, 'day');
-    const prevStart = calendarQuarterStart(prevEnd);
+    const prevStart = calendarQuarterStart(prevEnd, timezoneId);
     return [prevStart.format('YYYY-MM-DD'), prevEnd.format('YYYY-MM-DD')];
 }
 
-export function rangeForPreset(preset, currentRange = null) {
-    const now = dayjs();
+function resolveCompanyTz(timezoneId) {
+    const tz =
+        typeof timezoneId === 'string' && timezoneId.trim() !== ''
+            ? timezoneId.trim()
+            : COMPANY_DEFAULT_TIMEZONE;
+    try {
+        dayjs.tz('1970-01-01', tz);
+        return tz;
+    } catch {
+        return COMPANY_DEFAULT_TIMEZONE;
+    }
+}
+
+/** "now" in the company home timezone when given; otherwise browser local (scheduled jobs, etc.). */
+export function resolveNowForPresets(input, timezoneId) {
+    if (input != null && input !== '') {
+        return dayjs(input);
+    }
+    if (timezoneId != null && timezoneId !== '') {
+        return dayjs().tz(resolveCompanyTz(timezoneId));
+    }
+    return dayjs();
+}
+
+export function rangeForPreset(preset, currentRange = null, timezoneId = null) {
+    const now = resolveNowForPresets(null, timezoneId);
     if (preset === 'all') {
         return [null, null];
     }
@@ -53,12 +82,12 @@ export function rangeForPreset(preset, currentRange = null) {
         ];
     }
     if (preset === 'current_quarter') {
-        const a = calendarQuarterStart(now);
-        const b = calendarQuarterEnd(now);
+        const a = calendarQuarterStart(now, timezoneId);
+        const b = calendarQuarterEnd(now, timezoneId);
         return [a.format('YYYY-MM-DD'), b.format('YYYY-MM-DD')];
     }
     if (preset === 'last_quarter') {
-        return lastQuarterRange(now);
+        return lastQuarterRange(now, timezoneId);
     }
     if (preset === 'current_half_year') {
         const y = now.year();
@@ -116,8 +145,8 @@ export function isCompleteDateRange(range) {
     return Boolean(range[0] && range[1]);
 }
 
-export function normalizeDateRange(range) {
-    const r = rangeForPreset('custom', range);
+export function normalizeDateRange(range, timezoneId = null) {
+    const r = rangeForPreset('custom', range, timezoneId);
     return r[0] && r[1] ? [r[0], r[1]] : [null, null];
 }
 
@@ -128,12 +157,12 @@ export function areDateRangesEqual(a, b) {
     return a[0] === b[0] && a[1] === b[1];
 }
 
-export function dateRangeMatchesPreset(range, preset) {
+export function dateRangeMatchesPreset(range, preset, timezoneId = null) {
     if (preset === 'custom') {
         return true;
     }
     return areDateRangesEqual(
-        normalizeDateRange(range),
-        normalizeDateRange(rangeForPreset(preset, range))
+        normalizeDateRange(range, timezoneId),
+        normalizeDateRange(rangeForPreset(preset, range, timezoneId), timezoneId)
     );
 }

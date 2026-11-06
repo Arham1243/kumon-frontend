@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeMount, ref } from 'vue';
+import { computed, onBeforeMount, ref, watch } from 'vue';
 import { useAttendanceStore } from '@/modules/core/stores';
 import { useGlobalStore, useSessionStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
@@ -17,6 +17,7 @@ import {
     normalizeDateRange,
     rangeForPreset
 } from '@/utils/dateRangePresets';
+import { COMPANY_DEFAULT_TIMEZONE } from '@/config/enums';
 import dayjs from '@/plugins/dayjs';
 import Checkbox from 'primevue/checkbox';
 
@@ -68,12 +69,18 @@ const FILTER_CB_WRAP_NOT_CHECKED_OUT =
     '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-rose-900 ' +
     'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-500';
 
-function disableFutureAttendanceDate(date) {
-    return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
-}
 const attendanceStore = useAttendanceStore();
 const globalStore = useGlobalStore();
 const sessionStore = useSessionStore();
+
+const companyTzStr = computed(
+    () => sessionStore.myCompany?.timezone?.trim() || COMPANY_DEFAULT_TIMEZONE
+);
+
+function disableFutureAttendanceDate(date) {
+    const today = dayjs().tz(companyTzStr.value).startOf('day');
+    return dayjs(date).startOf('day').isAfter(today);
+}
 
 const kioskUrl = computed(() => {
     const uuid = sessionStore.myCompany?.uuid;
@@ -115,12 +122,20 @@ const showDialog = ref(false);
 const loadingStudents = ref(false);
 const students = ref([]);
 
-const todayRange = normalizeDateRange(rangeForPreset('today'));
 const periodPreset = ref('today');
-const dateRangeForRun = ref(todayRange ? [...todayRange] : [null, null]);
-const appliedDateRange = ref(
-    todayRange ? [...todayRange] : []
-);
+const dateRangeForRun = ref([null, null]);
+const appliedDateRange = ref([]);
+
+function initTodayDateRange() {
+    const r = normalizeDateRange(
+        rangeForPreset('today', null, companyTzStr.value),
+        companyTzStr.value
+    );
+    if (r[0] && r[1]) {
+        dateRangeForRun.value = [...r];
+        appliedDateRange.value = [...r];
+    }
+}
 
 const statusFilter = ref(null);
 const loadingSummary = ref(false);
@@ -237,6 +252,14 @@ async function applyDateFilter() {
     await getItems();
 }
 
+watch(companyTzStr, () => {
+    if (periodPreset.value === 'today') {
+        initTodayDateRange();
+        pagination.resetPageParams();
+        getItems();
+    }
+});
+
 function toggleCheckedInFilter() {
     if (statusFilter.value === 'checked_in') {
         statusFilter.value = null;
@@ -308,6 +331,8 @@ async function loadStudents(searchText = '') {
 }
 
 onBeforeMount(async () => {
+    await sessionStore.me();
+    initTodayDateRange();
     await Promise.all([getItems(), loadStudents()]);
 });
 
@@ -626,6 +651,7 @@ const save = async () => {
                                 v-model:date-range="dateRangeForRun"
                                 v-model:preset="periodPreset"
                                 default-preset="today"
+                                :company-timezone="companyTzStr"
                                 :disabled="loading"
                             />
                             <Button

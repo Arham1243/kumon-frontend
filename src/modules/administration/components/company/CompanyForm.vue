@@ -47,6 +47,7 @@ const formData = ref({
     country: '',
     timezone: COMPANY_DEFAULT_TIMEZONE,
     date_format: 'mm/dd/yy',
+    daily_summary_report_send_time: '20:00',
     logo: null
 });
 
@@ -83,6 +84,8 @@ function buildCompanyPayload() {
         country: formData.value.country,
         timezone: formData.value.timezone,
         date_format: formData.value.date_format,
+        daily_summary_report_send_time:
+            formData.value.daily_summary_report_send_time,
         logo: formData.value.logo
     };
 }
@@ -134,6 +137,8 @@ function applyCompanyResponse(res) {
         country: res.country ?? '',
         timezone: res.timezone || COMPANY_DEFAULT_TIMEZONE,
         date_format: normalizeDateFormatFromApi(res.date_format),
+        daily_summary_report_send_time:
+            res.daily_summary_report_send_time ?? '20:00',
         logo: res.logo_url || res.logo || null
     };
     resetDirty(formData.value);
@@ -221,7 +226,7 @@ onBeforeMount(() => {
                                             <div class="col-span-12">
                                                 <label
                                                     class="block mb-3 required"
-                                                    >Name</label
+                                                    >Company Name</label
                                                 >
                                                 <InputField
                                                     id="name"
@@ -235,6 +240,7 @@ onBeforeMount(() => {
                                         </div>
                                         <div>
                                             <AddressFields
+                                                title="Address"
                                                 :form-data="formData"
                                                 :disabled="formFieldDisabled"
                                                 :required-fields="{
@@ -258,14 +264,14 @@ onBeforeMount(() => {
                                                 <h3
                                                     class="text-lg font-semibold text-gray-800 dark:text-gray-100"
                                                 >
-                                                    Company logo
+                                                    Company Logo
                                                 </h3>
                                             </div>
                                             <p
                                                 class="mb-3 shrink-0 text-xs text-gray-500"
                                             >
-                                                PNG, JPG, GIF, or WebP. Max 500
-                                                KB.
+                                                PNG, JPG, GIF, or WebP. Maximum
+                                                file size 500 KB.
                                             </p>
                                             <div
                                                 class="flex aspect-square max-h-44 w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-gray-200 p-2"
@@ -273,7 +279,7 @@ onBeforeMount(() => {
                                                 <img
                                                     v-if="formData.logo"
                                                     :src="formData.logo"
-                                                    alt="Company logo"
+                                                    alt="Company Logo"
                                                     class="max-h-full max-w-full object-contain"
                                                 />
                                                 <img
@@ -291,7 +297,7 @@ onBeforeMount(() => {
                                             auto
                                             accept="image/png,image/jpeg,image/gif,image/webp"
                                             :max-file-size="512000"
-                                            choose-label="Upload logo"
+                                            choose-label="Upload Logo"
                                             class="company-logo-upload w-full shrink-0"
                                             :disabled="formFieldDisabled"
                                             @select="onFileSelect"
@@ -301,10 +307,9 @@ onBeforeMount(() => {
                             </TabPanel>
                             <TabPanel value="1">
                                 <div class="grid grid-cols-12 gap-6">
-                                    <!-- Home timezone hidden for now
                                     <div class="col-span-12 md:col-span-4">
                                         <label class="block mb-3"
-                                            >Home timezone</label
+                                            >Home Timezone</label
                                         >
                                         <InputField
                                             id="timezone"
@@ -321,10 +326,9 @@ onBeforeMount(() => {
                                             filter-placeholder="Search timezone"
                                         />
                                     </div>
-                                    -->
                                     <div class="col-span-12 md:col-span-4">
                                         <label class="block mb-3"
-                                            >Date format</label
+                                            >Date Format</label
                                         >
                                         <InputField
                                             id="date_format"
@@ -337,6 +341,28 @@ onBeforeMount(() => {
                                             class="w-full"
                                             :disabled="formFieldDisabled"
                                         />
+                                    </div>
+                                    <div class="col-span-12 md:col-span-4">
+                                        <label
+                                            class="block mb-3"
+                                            for="daily_summary_report_send_time"
+                                            >Daily Summary Report Send Time</label
+                                        >
+                                        <InputField
+                                            id="daily_summary_report_send_time"
+                                            v-model="
+                                                formData.daily_summary_report_send_time
+                                            "
+                                            variant="time"
+                                            error-key="daily_summary_report_send_time"
+                                            class="w-full"
+                                            :disabled="formFieldDisabled"
+                                        />
+                                        <p
+                                            class="mt-3 text-sm text-gray-600 dark:text-gray-400"
+                                        >
+                                            In your Home Timezone, choose what time each day to send the Daily Summary Report.
+                                        </p>
                                     </div>
                                 </div>
                             </TabPanel>

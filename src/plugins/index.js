@@ -26,6 +26,10 @@ export function registerPlugins(app) {
 
     app.use(PrimeVue, {
         ripple: true,
+        locale: {
+            am: 'AM',
+            pm: 'PM'
+        },
         theme: {
             preset: AppPreset,
             options: {

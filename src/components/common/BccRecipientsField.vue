@@ -18,7 +18,7 @@ const props = defineProps({
     },
     placeholder: {
         type: String,
-        default: 'Add recipients'
+        default: ''
     },
     errorMessages: {
         type: [String, Array]

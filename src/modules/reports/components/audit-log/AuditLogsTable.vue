@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeMount, ref } from 'vue';
+import { computed, onBeforeMount, ref, watch } from 'vue';
 import Card from 'primevue/card';
 import Column from 'primevue/column';
 import Tag from 'primevue/tag';
@@ -17,14 +17,20 @@ import {
 } from '@/config';
 import { useHelpers, useTableColumnFilters } from '@/composables';
 import { TEXT_COLUMN_FILTER, enumToSelectFilter } from '@/utils/tableFilters';
-import { isCompleteDateRange } from '@/utils/dateRangePresets';
+import { isCompleteDateRange, rangeForPreset } from '@/utils/dateRangePresets';
+import { useSessionStore } from '@/stores';
 import {
     auditLogEvents,
     auditLogResources
 } from '@/modules/reports/config/auditLog';
 
 const activityLogStore = useActivityLogStore();
-const { formatDateTime } = useHelpers();
+const sessionStore = useSessionStore();
+const { formatDate, formatDateTime } = useHelpers();
+
+const companyTz = computed(
+    () => sessionStore.myCompany?.timezone || null
+);
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions('', [
@@ -120,8 +126,31 @@ function formatChangeValue(value) {
             return String(value);
         }
     }
-    return String(value);
+    const s = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        return formatDate(s);
+    }
+    if (
+        /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s) ||
+        s.includes('T')
+    ) {
+        return formatDateTime(s);
+    }
+    return s;
 }
+
+watch(
+    companyTz,
+    () => {
+        if (periodPreset.value === 'all') {
+            return;
+        }
+        const r = rangeForPreset(periodPreset.value, dateRangeForRun.value, companyTz.value);
+        if (r[0] && r[1]) {
+            dateRangeForRun.value = [...r];
+        }
+    }
+);
 
 function formatEventName(event) {
     if (!event) {
@@ -234,6 +263,7 @@ async function getItems() {
 }
 
 onBeforeMount(async () => {
+    await sessionStore.me();
     await getItems();
 });
 </script>
@@ -273,6 +303,7 @@ onBeforeMount(async () => {
                                 v-model:date-range="dateRangeForRun"
                                 v-model:preset="periodPreset"
                                 default-preset="all"
+                                :company-timezone="companyTz"
                                 :disabled="loading"
                             />
                             <Button

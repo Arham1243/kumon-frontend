@@ -57,6 +57,11 @@ const props = defineProps({
     clearable: {
         type: Boolean,
         default: true
+    },
+    /** IANA timezone for preset boundaries (company home); omit for browser local. */
+    companyTimezone: {
+        type: String,
+        default: null
     }
 });
 
@@ -75,7 +80,7 @@ function applyPresetSync(preset) {
         return;
     }
     const nextRange = normalizeDateRange(
-        rangeForPreset(preset, props.dateRange)
+        rangeForPreset(preset, props.dateRange, props.companyTimezone)
     );
     if (areDateRangesEqual(nextRange, props.dateRange)) {
         return;
@@ -98,13 +103,26 @@ function onPresetChange(value) {
 const localDateRange = computed({
     get: () => props.dateRange,
     set: (value) => {
-        const nextRange = normalizeDateRange(value);
+        const nextRange = normalizeDateRange(value, props.companyTimezone);
         if (areDateRangesEqual(nextRange, props.dateRange)) {
             return;
         }
         emit('update:dateRange', nextRange);
     }
 });
+
+watch(
+    () => props.companyTimezone,
+    () => {
+        if (
+            props.preset &&
+            props.preset !== 'custom' &&
+            props.preset !== 'all'
+        ) {
+            applyPresetSync(props.preset);
+        }
+    }
+);
 
 watch(
     () => props.dateRange,
@@ -123,7 +141,7 @@ watch(
             return;
         }
         if (a && b && props.preset !== 'custom') {
-            if (dateRangeMatchesPreset(range, props.preset)) {
+            if (dateRangeMatchesPreset(range, props.preset, props.companyTimezone)) {
                 return;
             }
             emit('update:preset', 'custom');

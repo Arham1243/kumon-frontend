@@ -1,8 +1,7 @@
 import dayjs from '@/plugins/dayjs';
 import { ability } from '@/plugins/ability';
 import { useSessionStore } from '@/stores';
-
-const DEFAULT_ADMIN_DISPLAY_TIMEZONE = 'America/New_York';
+import { COMPANY_DEFAULT_TIMEZONE } from '@/config/enums';
 
 const formatMap = {
     'mm/dd/yy': 'MM/DD/YYYY',
@@ -18,7 +17,7 @@ export const useHelpers = () => {
         if (typeof companyTz === 'string' && companyTz.trim() !== '') {
             return companyTz.trim();
         }
-        return DEFAULT_ADMIN_DISPLAY_TIMEZONE;
+        return COMPANY_DEFAULT_TIMEZONE;
     }
 
     function resolveMomentDateFormat(format) {
@@ -33,7 +32,12 @@ export const useHelpers = () => {
         if (date === 'Invalid date' || !date) return '-';
 
         const datePart = resolveMomentDateFormat(format);
-        return dayjs(date).format(datePart);
+        const tz = adminDisplayTimezone();
+        const d = String(date).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+            return dayjs.tz(d, 'YYYY-MM-DD', tz).format(datePart);
+        }
+        return dayjs.utc(date).tz(tz).format(datePart);
     }
 
     function formatDateTime(date, format) {

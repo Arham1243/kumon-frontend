@@ -20,8 +20,13 @@ import {
     EMAIL_LOG_STATUS_FILTER
 } from '@/utils/tableFilters';
 import { isCompleteDateRange } from '@/utils/dateRangePresets';
+import { useSessionStore } from '@/stores';
 
 const emailLogStore = useEmailLogStore();
+const sessionStore = useSessionStore();
+const companyTz = computed(
+    () => sessionStore.myCompany?.timezone || null
+);
 const {
     formatDateTime,
     makeSlugToTitleCase,
@@ -214,6 +219,7 @@ function recipientChipItems(data) {
 }
 
 onBeforeMount(async () => {
+    await sessionStore.me();
     await getItems();
 });
 </script>
@@ -259,6 +265,7 @@ onBeforeMount(async () => {
                                 v-model:date-range="dateRangeForRun"
                                 v-model:preset="periodPreset"
                                 default-preset="all"
+                                :company-timezone="companyTz"
                                 :disabled="loading"
                             />
                             <Button
