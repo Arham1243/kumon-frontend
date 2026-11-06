@@ -4,7 +4,6 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useStudentStore } from '@/modules/core/stores';
 import { useGlobalStore } from '@/stores';
 import { useFormDirty } from '@/composables/useFormDirty';
-import useEventsBus from '@/composables/useEventsBus';
 import { useHelpers } from '@/composables';
 import dayjs from '@/plugins/dayjs';
 import TitleHeader from '@/components/common/TitleHeader.vue';
@@ -22,8 +21,6 @@ const route = useRoute();
 const studentStore = useStudentStore();
 const globalStore = useGlobalStore();
 const helpers = useHelpers();
-const { emit: emitEvent } = useEventsBus();
-
 const STATUS_ACTION_BLOCKED_TOOLTIP =
     'Save or cancel your unsaved changes before using this action.';
 
@@ -219,11 +216,6 @@ async function getItem() {
         studentRecord.value = student;
         mapRecordToForm(student);
         resetDirty(formData.value);
-
-        const label = formData.value.name?.trim() || '';
-        if (label) {
-            emitEvent('updateDetailsBreadcrumb', label);
-        }
     } catch (error) {
         console.error(error);
         studentRecord.value = null;
@@ -429,6 +421,8 @@ const titleEndDateDisplay = computed(() => {
 
 const pageTitle = computed(() => formData.value.name?.trim() || 'Edit Student');
 
+const formInputsDisabled = computed(() => busy.value);
+
 function goBackFromNotFound() {
     router.push({ name: 'Students' });
 }
@@ -436,15 +430,11 @@ function goBackFromNotFound() {
 
 <template>
     <div v-if="studentUuid" class="student-edit-split">
-        <aside class="student-edit-split__aside">
-            <StudentPickerList
-                :selected-uuid="String(studentUuid)"
-                :current-record="studentRecord"
-                :patch-row="pickerPatchRow"
-                :disabled="studentSwitchDisabled"
-                @select="requestStudentSwitch"
-            >
-                <template #headingBefore>
+        <div class="student-edit-split__columns">
+            <aside class="student-edit-split__aside">
+                <div
+                    class="student-edit-split__aside-title mb-7 flex min-w-0 flex-wrap items-center gap-3 sm:items-start"
+                >
                     <Button
                         type="button"
                         variant="outlined"
@@ -454,10 +444,22 @@ function goBackFromNotFound() {
                         :disabled="busy"
                         @click="goBack"
                     />
-                </template>
-            </StudentPickerList>
-        </aside>
-        <div class="student-edit-split__main">
+                    <h2
+                        class="m-0 mt-1 max-w-[min(100%,40rem)] truncate text-2xl font-bold capitalize sm:text-3xl"
+                    >
+                        Students
+                    </h2>
+                </div>
+                <StudentPickerList
+                    hide-heading
+                    :selected-uuid="String(studentUuid)"
+                    :current-record="studentRecord"
+                    :patch-row="pickerPatchRow"
+                    :disabled="studentSwitchDisabled"
+                    @select="requestStudentSwitch"
+                />
+            </aside>
+            <div class="student-edit-split__main">
             <Loader v-if="loading" />
             <template v-else-if="!studentRecord">
                 <div
@@ -471,7 +473,7 @@ function goBackFromNotFound() {
                 </div>
             </template>
             <template v-else>
-        <TitleHeader align-top>
+        <TitleHeader align-top class="student-edit-split__main-header !mb-3">
             <template #title>
                 <div class="flex flex-wrap items-center gap-5">
                     <div class="min-w-0">
@@ -553,6 +555,7 @@ function goBackFromNotFound() {
             </template>
         </TitleHeader>
 
+        <div class="student-edit-split__main-scroll">
         <Card>
             <template #content>
                 <div
@@ -567,7 +570,7 @@ function goBackFromNotFound() {
                             v-model="formData.name"
                             variant="text"
                             class="w-full"
-                            :disabled="busy"
+                            :disabled="formInputsDisabled"
                             @keyup.enter="save"
                         />
                     </div>
@@ -587,7 +590,7 @@ function goBackFromNotFound() {
                             placeholder="Select"
                             v-model="formData.start_date"
                             class="w-full"
-                            :disabled="busy"
+                            :disabled="formInputsDisabled"
                         />
                     </div>
                     <div class="min-w-0">
@@ -604,7 +607,7 @@ function goBackFromNotFound() {
                             variant="text"
                             class="w-full"
                             maxlength="32"
-                            :disabled="busy"
+                            :disabled="formInputsDisabled"
                         />
                     </div>
                     <div class="min-w-0">
@@ -621,7 +624,7 @@ function goBackFromNotFound() {
                             variant="text"
                             class="w-full"
                             maxlength="32"
-                            :disabled="busy"
+                            :disabled="formInputsDisabled"
                         />
                     </div>
                     <div class="min-w-0">
@@ -643,7 +646,7 @@ function goBackFromNotFound() {
                             :max="999999999.99"
                             :minFractionDigits="2"
                             :maxFractionDigits="2"
-                            :disabled="busy"
+                            :disabled="formInputsDisabled"
                         />
                     </div>
                     <div class="flex min-h-0 min-w-0 flex-col">
@@ -656,7 +659,7 @@ function goBackFromNotFound() {
                                         v-model="formData.maths"
                                         binary
                                         inputId="student_edit_maths"
-                                        :disabled="busy"
+                                        :disabled="formInputsDisabled"
                                     />
                                     <label
                                         for="student_edit_maths"
@@ -671,7 +674,7 @@ function goBackFromNotFound() {
                                         v-model="formData.reading"
                                         binary
                                         inputId="student_edit_reading"
-                                        :disabled="busy"
+                                        :disabled="formInputsDisabled"
                                     />
                                     <label
                                         for="student_edit_reading"
@@ -737,6 +740,7 @@ function goBackFromNotFound() {
                 </div>
             </template>
         </Card>
+        </div>
 
         <BaseDialog
             v-model:visible="showAssignCardDialog"
@@ -806,6 +810,7 @@ function goBackFromNotFound() {
             </div>
         </Confirmation>
             </template>
+            </div>
         </div>
     </div>
 </template>
@@ -818,13 +823,24 @@ function goBackFromNotFound() {
     min-height: 16rem;
 }
 
+.student-edit-split__columns {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
 .student-edit-split__aside {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
     min-height: 0;
     flex-shrink: 0;
     flex: 1 1 auto;
+}
+
+.student-edit-split__aside-title {
+    flex-shrink: 0;
 }
 
 .student-edit-split__main {
@@ -835,13 +851,33 @@ function goBackFromNotFound() {
     flex: 1 1 auto;
 }
 
+.student-edit-split__main :deep(.student-edit-split__main-header) {
+    flex-shrink: 0;
+}
+
+.student-edit-split__main-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: visible;
+}
+
 @media (min-width: 1024px) {
     .student-edit-split {
-        flex-direction: row;
-        align-items: stretch;
         height: calc(100dvh - 8.5rem);
         min-height: 0;
         overflow: hidden;
+        gap: 0;
+    }
+
+    .student-edit-split__columns {
+        flex-direction: row;
+        align-items: stretch;
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
         gap: 1.5rem;
     }
 
@@ -856,6 +892,10 @@ function goBackFromNotFound() {
         flex: 1 1 0;
         min-height: 0;
         height: 100%;
+        overflow: hidden;
+    }
+
+    .student-edit-split__main-scroll {
         overflow-y: auto;
         overflow-x: hidden;
         overscroll-behavior: contain;

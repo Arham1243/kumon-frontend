@@ -13,6 +13,11 @@ import StatusTag from '@/components/common/StatusTag.vue';
 import ProgressSpinner from 'primevue/progressspinner';
 
 const props = defineProps({
+    /** Hide the top Students heading (parent renders it in a shared title row). */
+    hideHeading: {
+        type: Boolean,
+        default: false
+    },
     selectedUuid: {
         type: String,
         default: ''
@@ -44,6 +49,8 @@ const totalRecords = ref(0);
 /** When we prepend current student not on page 1, skip that uuid on later appends. */
 const skipUuidOnAppend = ref('');
 const loadingInitial = ref(false);
+/** DataTable overlay only after user runs search, not on first list load. */
+const showTableLoadingOverlay = ref(false);
 const loadingMore = ref(false);
 const scrollHostRef = ref(null);
 const loadSentinelRef = ref(null);
@@ -107,7 +114,7 @@ function mergeFirstPageWithCurrent(rows, searchTerm) {
     return list;
 }
 
-async function fetchPage({ append = false } = {}) {
+async function fetchPage({ append = false, showOverlay = false } = {}) {
     const term = trimmedSearch.value;
 
     if (append) {
@@ -121,6 +128,9 @@ async function fetchPage({ append = false } = {}) {
         loadingMore.value = true;
     } else {
         loadingInitial.value = true;
+        if (showOverlay) {
+            showTableLoadingOverlay.value = true;
+        }
     }
 
     const nextPage = append ? page.value + 1 : 1;
@@ -165,6 +175,9 @@ async function fetchPage({ append = false } = {}) {
     } finally {
         loadingInitial.value = false;
         loadingMore.value = false;
+        if (!append) {
+            showTableLoadingOverlay.value = false;
+        }
     }
 }
 
@@ -178,7 +191,7 @@ function onSearch() {
     page.value = 1;
     totalRecords.value = 0;
     skipUuidOnAppend.value = '';
-    void fetchPage({ append: false });
+    void fetchPage({ append: false, showOverlay: true });
 }
 
 function disconnectObserver() {
@@ -265,18 +278,34 @@ watch(
     { deep: true }
 );
 
+/** Keep selection visible without another search API when parent loads a student not on the first page. */
 watch(
-    () => props.currentRecord?.uuid,
+    () => [props.selectedUuid, props.currentRecord],
     () => {
         if (trimmedSearch.value !== '') {
             return;
         }
-        void fetchPage({ append: false });
-    }
+        const uuid = props.selectedUuid;
+        const cr = props.currentRecord;
+        if (!uuid || !cr?.uuid || cr.uuid !== uuid) {
+            return;
+        }
+        if (items.value.some((r) => r.uuid === uuid)) {
+            skipUuidOnAppend.value = '';
+            return;
+        }
+        const pinned = rowForList(cr);
+        if (!pinned) {
+            return;
+        }
+        items.value = [pinned, ...items.value];
+        skipUuidOnAppend.value = uuid;
+    },
+    { deep: true, immediate: true }
 );
 
 onBeforeMount(() => {
-    void fetchPage({ append: false });
+    void fetchPage({ append: false, showOverlay: false });
 });
 
 onBeforeUnmount(() => {
@@ -310,6 +339,7 @@ function onRowUnselect(event) {
 <template>
     <div class="student-picker-list">
         <div
+            v-if="!hideHeading"
             class="student-picker-list__heading mb-2 flex min-w-0 flex-wrap items-center gap-3"
         >
             <slot name="headingBefore" />
@@ -319,14 +349,16 @@ function onRowUnselect(event) {
                 Students
             </h2>
         </div>
-        <Search
-            id="student_picker_search"
-            v-model="searchQuery"
-            placeholder="Search"
-            :disabled="disabled"
-            @search="onSearch"
-        />
         <div class="student-picker-list__table-host">
+            <div class="student-picker-list__search">
+                <Search
+                    id="student_picker_search"
+                    v-model="searchQuery"
+                    placeholder="Search"
+                    :disabled="disabled"
+                    @search="onSearch"
+                />
+            </div>
             <div
                 ref="scrollHostRef"
                 class="student-picker-list__table-scroll"
@@ -339,7 +371,7 @@ function onRowUnselect(event) {
                     selection-mode="single"
                     :meta-key-selection="false"
                     :paginator="false"
-                    :loading="loadingInitial"
+                    :loading="showTableLoadingOverlay"
                     :scrollable="false"
                     :resizable-columns="false"
                     :striped-rows="true"
@@ -368,7 +400,7 @@ function onRowUnselect(event) {
                         selection-mode="single"
                         header=""
                         header-style="width: 2rem; padding: 0"
-                        body-style="width: 2rem; padding: 0.35rem 0.35rem 0.35rem 0.5rem"
+                        body-style="width: 2rem; padding: 0.35rem 0.35rem 0.35rem 0.9rem"
                     />
                     <Column header="">
                         <template #body="{ data }">
@@ -387,7 +419,7 @@ function onRowUnselect(event) {
                                 <span
                                     v-if="data.student_id"
                                     class="student-picker-list__meta"
-                                    >{{ data.student_id }}</span
+                                    >Student ID: {{ data.student_id }}</span
                                 >
                             </div>
                         </template>
@@ -435,8 +467,17 @@ function onRowUnselect(event) {
     min-height: 0;
     background: var(--p-content-background, #fff);
     border: 1px solid var(--p-content-border-color, rgb(226 232 240));
-    border-radius: var(--p-content-border-radius, 6px);
+    border-radius: var(
+        --p-card-border-radius,
+        var(--p-content-border-radius, 6px)
+    );
     overflow: hidden;
+}
+
+.student-picker-list__search {
+    flex-shrink: 0;
+    padding: 0.75rem 0.75rem 0.625rem;
+    border-bottom: 1px solid var(--p-content-border-color, rgb(226 232 240));
 }
 
 .student-picker-list__table-scroll {
@@ -543,7 +584,7 @@ function onRowUnselect(event) {
 }
 
 .student-picker-list__table :deep(.p-datatable-tbody > tr > td) {
-    padding: 0.35rem 0.5rem;
+    padding: 0.65rem 0.5rem;
     vertical-align: middle;
 }
 
