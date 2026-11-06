@@ -20,6 +20,7 @@ const tagProps = computed(() => {
         case 'approved':
         case 'posted':
         case 'settled':
+        case 'assigned':
             return { value, severity: 'success' };
         case 'no':
         case 'inactive':
@@ -38,6 +39,7 @@ const tagProps = computed(() => {
             return { value, severity: 'warn' };
         case 'draft':
         case 'unpaid':
+        case 'unassigned':
             return { value, class: '!bg-gray-200 !text-gray-500' };
         case 'new':
             return { value, severity: 'info' };

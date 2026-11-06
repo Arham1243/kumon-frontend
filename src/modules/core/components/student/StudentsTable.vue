@@ -19,9 +19,9 @@ import {
 import InputField from '@/components/common/InputField.vue';
 import StatusTag from '@/components/common/StatusTag.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
-import Confirmation from '@/components/common/Confirmation.vue';
 import dayjs from '@/plugins/dayjs';
 import { isCompleteDateRange } from '@/utils/dateRangePresets';
+import { ability } from '@/plugins/ability';
 
 const helpers = useHelpers();
 
@@ -52,27 +52,18 @@ const FILTER_CB_WRAP_INACTIVE =
     '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-rose-900 ' +
     'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-500';
 
-function disableFutureEndDate(date) {
-    return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
-}
 const router = useRouter();
 const studentStore = useStudentStore();
 const globalStore = useGlobalStore();
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions();
-const menu = ref();
 const dialogRef = ref(null);
-const selectedItem = ref(null);
 const loading = ref(false);
 const items = ref([]);
 const busy = ref(false);
 const totalRecords = ref();
 const showDialog = ref(false);
-const changeStatusDialog = ref(false);
-const deactivateEndDate = ref(null);
-const showAssignCardDialog = ref(false);
-const cardAssignBusy = ref(false);
 const assignCardEnabled = ref(false);
 const assignCardFlowStarted = ref(false);
 const activeCount = ref(0);
@@ -89,7 +80,6 @@ function startAssignCardFlow() {
     assignCardFlowStarted.value = true;
     assignCardEnabled.value = true;
 }
-const assignCardStubForm = ref({ _assignCard: true });
 const assigningId = ref(false);
 const previewStudentId = ref('');
 const nextIdToken = ref(0);
@@ -113,16 +103,6 @@ const cardUidError = computed(() => {
         return fieldErrors[0] ?? '';
     }
     return String(fieldErrors);
-});
-
-const assignCardDialogHeader = computed(() => {
-    const row = selectedItem.value;
-    if (!row) {
-        return 'Assign Card';
-    }
-    return String(row.card_uid ?? '').trim()
-        ? 'Replace Card'
-        : 'Assign Card';
 });
 
 const filterColumnConfigs = [
@@ -287,43 +267,6 @@ onBeforeMount(async () => {
     await Promise.all([getItems(), refreshStatusCounts()]);
 });
 
-const menuItems = computed(() => {
-    if (!selectedItem.value) return [];
-
-    const cardMenuItem = isItemActive.value
-        ? {
-              label: String(selectedItem.value.card_uid ?? '').trim()
-                  ? 'Replace Card'
-                  : 'Assign New Card',
-              icon: 'pi pi-id-card',
-              command: () => openAssignCardDialog(),
-              permission: 'core.students.edit'
-          }
-        : null;
-
-    const allMenuItems = [
-        {
-            label: 'Edit',
-            icon: 'pi pi-pencil',
-            command: () => editItem(),
-            permission: 'core.students.edit'
-        },
-        ...(cardMenuItem ? [cardMenuItem] : []),
-        {
-            label: isItemActive.value ? 'Make Inactive' : 'Make Active',
-            icon: isItemActive.value ? 'pi pi-times' : 'pi pi-check',
-            command: () => showChangeStatusDialog(),
-            permission: 'core.students.edit'
-        }
-    ];
-
-    return helpers.filterByPermission(allMenuItems);
-});
-
-const isItemActive = computed(() => {
-    return selectedItem.value && !!selectedItem.value.status;
-});
-
 const dialogHeader = computed(() => {
     const base = 'New Student';
     const id = previewStudentId.value;
@@ -332,15 +275,6 @@ const dialogHeader = computed(() => {
     }
     return base;
 });
-
-const showChangeStatusDialog = () => {
-    deactivateEndDate.value = null;
-    changeStatusDialog.value = true;
-};
-
-const deactivateConfirmDisabled = computed(
-    () => isItemActive.value && !deactivateEndDate.value
-);
 
 const openDialog = () => {
     resetForm();
@@ -352,16 +286,6 @@ const openDialog = () => {
 const closeDialog = () => {
     showDialog.value = false;
     resetForm();
-};
-
-const openAssignCardDialog = () => {
-    globalStore.clearErrors();
-    showAssignCardDialog.value = true;
-};
-
-const closeAssignCardDialog = () => {
-    showAssignCardDialog.value = false;
-    globalStore.clearErrors();
 };
 
 watch(assignCardEnabled, (enabled) => {
@@ -437,18 +361,20 @@ const resetForm = () => {
     globalStore.clearErrors();
 };
 
-const editItem = () => {
-    const row = selectedItem.value;
+function studentRowClass() {
+    return ability.can('core.students.edit') ? 'cursor-pointer' : undefined;
+}
+
+function onStudentRowClick(event) {
+    if (!ability.can('core.students.edit')) {
+        return;
+    }
+    const row = event.data;
     if (!row?.uuid) {
         return;
     }
     router.push({ name: 'EditStudent', params: { uuid: row.uuid } });
-};
-
-const showActions = (event, item) => {
-    selectedItem.value = item;
-    menu.value.toggle(event);
-};
+}
 
 const onSortChange = (event) => {
     pagination.resetPageParams();
@@ -492,34 +418,12 @@ const save = async () => {
         await studentStore.create(payload);
         closeDialog();
         await Promise.all([getItems(), refreshStatusCounts()]);
-        selectedItem.value = null;
     } catch (error) {
         console.error(error);
     } finally {
         busy.value = false;
     }
 };
-
-async function onAssignCardScan(uid) {
-    if (cardAssignBusy.value || !selectedItem.value) {
-        return;
-    }
-    globalStore.clearErrors();
-    const isReplace = !!String(selectedItem.value.card_uid ?? '').trim();
-    try {
-        cardAssignBusy.value = true;
-        await studentStore.updateCardUid(selectedItem.value.uuid, uid, {
-            isReplace
-        });
-        closeAssignCardDialog();
-        await Promise.all([getItems(), refreshStatusCounts()]);
-        selectedItem.value = null;
-    } catch (error) {
-        console.error(error);
-    } finally {
-        cardAssignBusy.value = false;
-    }
-}
 
 function onCreateCardScan(uid) {
     if (busy.value) {
@@ -529,23 +433,6 @@ function onCreateCardScan(uid) {
     formData.value.card_uid = uid;
 }
 
-const changeStatus = async () => {
-    try {
-        loading.value = true;
-        if (selectedItem.value) {
-            const payload = isItemActive.value
-                ? { end_date: deactivateEndDate.value }
-                : { end_date: null };
-            await studentStore.changeStatus(selectedItem.value.uuid, payload);
-        }
-        changeStatusDialog.value = false;
-        deactivateEndDate.value = null;
-        await Promise.all([getItems(), refreshStatusCounts()]);
-        selectedItem.value = null;
-    } finally {
-        loading.value = false;
-    }
-};
 </script>
 
 <template>
@@ -755,6 +642,7 @@ const changeStatus = async () => {
         <template #content>
             <BaseTable
                 class="students-table-columns"
+                data-key="uuid"
                 :reorderableColumns="true"
                 columnResizeMode="fit"
                 :value="items"
@@ -764,9 +652,11 @@ const changeStatus = async () => {
                 :loading="loading"
                 :column-filters="true"
                 v-model:filters="primeFilters"
+                :rowClass="studentRowClass"
                 @filter="onColumnFilter"
                 @sort="onSortChange"
                 @page="onPageChange"
+                @row-click="onStudentRowClick"
             >
                 <template #empty> No students found. </template>
                 <Column
@@ -986,32 +876,6 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
-                <Column
-                    columnKey="actions"
-                    v-if="$ability.can('core.students.edit')"
-                    header="Actions"
-                    headerClass="whitespace-nowrap"
-                    bodyClass="whitespace-nowrap text-right"
-                >
-                    <template #body="{ data }">
-                        <Button
-                            class="!px-3 !py-2"
-                            label="Actions"
-                            variant="outlined"
-                            iconPos="right"
-                            icon="pi pi-chevron-down"
-                            size="small"
-                            @click="showActions($event, data)"
-                        />
-
-                        <Menu
-                            ref="menu"
-                            id="student_overlay_menu"
-                            :model="menuItems"
-                            :popup="true"
-                        />
-                    </template>
-                </Column>
             </BaseTable>
         </template>
     </Card>
@@ -1194,60 +1058,6 @@ const changeStatus = async () => {
         </div>
     </BaseDialog>
 
-    <BaseDialog
-        v-if="$ability.can('core.students.edit')"
-        v-model:visible="showAssignCardDialog"
-        :header="assignCardDialogHeader"
-        :formData="assignCardStubForm"
-        :enableDirtyCheck="false"
-        :busy="cardAssignBusy"
-        cancelLabel="Cancel"
-        @cancel="closeAssignCardDialog"
-    >
-        <CardScanner
-            :busy="cardAssignBusy"
-            :error="cardUidError"
-            @scan="onAssignCardScan"
-        />
-        <template #footer>
-            <Button
-                label="Close"
-                type="button"
-                :disabled="cardAssignBusy"
-                @click="closeAssignCardDialog"
-            />
-        </template>
-    </BaseDialog>
-
-    <Confirmation
-        v-model="changeStatusDialog"
-        :variant="isItemActive ? 'danger' : 'success'"
-        :header="isItemActive ? 'Deactivate Student' : 'Activate Student'"
-        :content="
-            selectedItem
-                ? `Are you sure you want to ${isItemActive ? 'deactivate' : 'activate'} \u201C${selectedItem.name}\u201D?`
-                : 'Change status of this student?'
-        "
-        :confirmButtonText="isItemActive ? 'Deactivate' : 'Activate'"
-        :confirmDisabled="deactivateConfirmDisabled"
-        :closeOnConfirm="false"
-        :loading="loading"
-        @confirm="changeStatus"
-    >
-        <div v-if="isItemActive" class="pb-4">
-            <label class="block required mb-2" for="deactivate_end_date"
-                >End Date</label
-            >
-            <InputField
-                variant="date"
-                id="deactivate_end_date"
-                errorKey="end_date"
-                v-model="deactivateEndDate"
-                class="w-full"
-                :disabled-date="disableFutureEndDate"
-            />
-        </div>
-    </Confirmation>
 </template>
 
 <style scoped>

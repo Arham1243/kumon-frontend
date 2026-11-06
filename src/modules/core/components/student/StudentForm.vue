@@ -76,6 +76,36 @@ const assignCardDialogHeader = computed(() => {
     return String(row.card_uid ?? '').trim() ? 'Replace Card' : 'Assign Card';
 });
 
+const cardUidDisplay = computed(() =>
+    String(studentRecord.value?.card_uid ?? '').trim()
+);
+
+const hasSavedCard = computed(() => cardUidDisplay.value.length > 0);
+
+const cardAssignedAtDisplay = computed(() => {
+    const raw = studentRecord.value?.card_assigned_at;
+    if (raw === null || raw === undefined || raw === '') {
+        return null;
+    }
+    return helpers.formatDateTime(raw);
+});
+
+const cardNumberPanelValue = computed(() =>
+    hasSavedCard.value ? cardUidDisplay.value : '-'
+);
+
+const cardAssignedAtPanelValue = computed(
+    () => cardAssignedAtDisplay.value ?? '-'
+);
+
+const assignOrReplaceCardButtonLabel = computed(() =>
+    hasSavedCard.value ? 'Replace Card' : 'Assign Card'
+);
+
+const cardManagementDisabled = computed(
+    () => busy.value || statusBusy.value || !isActive.value
+);
+
 const isActive = computed(() => !!studentRecord.value?.status);
 
 const deactivateConfirmDisabled = computed(
@@ -434,26 +464,7 @@ function goBackFromNotFound() {
 
         <Card>
             <template #content>
-                <div class="mb-6 flex flex-wrap items-center justify-end gap-4">
-                    <Button
-                        v-if="isActive"
-                        type="button"
-                        :label="
-                            String(studentRecord.card_uid ?? '').trim()
-                                ? 'Replace Card'
-                                : 'Assign Card'
-                        "
-                        icon="pi pi-id-card"
-                        variant="outlined"
-                        size="small"
-                        :disabled="busy || statusBusy"
-                        @click="openAssignCardDialog"
-                    />
-                </div>
-
-                <div
-                    class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-                >
+                <div class="grid grid-cols-1 gap-x-4 gap-y-4 lg:grid-cols-5">
                     <div class="min-w-0">
                         <label class="required mb-2 block" for="student_edit_name"
                             >Name</label
@@ -520,7 +531,7 @@ function goBackFromNotFound() {
                             :disabled="busy"
                         />
                     </div>
-                    <div class="min-w-0 sm:col-span-2 lg:col-span-3 xl:col-span-1">
+                    <div class="min-w-0">
                         <label class="mb-2 block" for="student_edit_fee">
                             Tuition Fee
                             <span class="text-sm font-normal text-muted-color">
@@ -579,14 +590,61 @@ function goBackFromNotFound() {
                         </div>
                     </div>
                 </div>
+            </template>
+        </Card>
 
-                <div class="mt-6">
-                    <span class="mb-2 block text-sm text-muted-color">Card</span>
-                    <p class="text-base">
-                        {{
-                            String(studentRecord.card_uid ?? '').trim() || '-'
-                        }}
-                    </p>
+        <Card v-if="isActive" class="mt-5">
+            <template #title>
+                <div
+                    class="customer-token-section-title mb-2 flex flex-wrap items-center gap-3 w-full"
+                >
+                    <h2 class="text-xl font-semibold m-0">Card Management</h2>
+                    <StatusTag
+                        :status="hasSavedCard ? 'assigned' : 'unassigned'"
+                    />
+                </div>
+            </template>
+            <template #content>
+                <div class="student-card-schedule-panel panel-surface">
+                    <div class="student-card-schedule-panel__action-anchor">
+                        <Button
+                            type="button"
+                            :label="assignOrReplaceCardButtonLabel"
+                            :disabled="cardManagementDisabled"
+                            @click="openAssignCardDialog"
+                        />
+                    </div>
+                    <div
+                        class="student-card-schedule-panel__grid grid grid-cols-12 gap-x-4 gap-y-4"
+                    >
+                        <div
+                            class="student-card-schedule-panel__field col-span-12 min-w-0 lg:col-span-3"
+                        >
+                            <span class="student-card-schedule-panel__label"
+                                >Card number</span
+                            >
+                            <span
+                                class="student-card-schedule-panel__value block font-mono"
+                                :class="{
+                                    'text-primary':
+                                        hasSavedCard &&
+                                        cardNumberPanelValue !== '-'
+                                }"
+                                >{{ cardNumberPanelValue }}</span
+                            >
+                        </div>
+                        <div
+                            class="student-card-schedule-panel__field col-span-12 min-w-0 lg:col-span-3"
+                        >
+                            <span class="student-card-schedule-panel__label"
+                                >Assigned at</span
+                            >
+                            <span
+                                class="student-card-schedule-panel__value block"
+                                >{{ cardAssignedAtPanelValue }}</span
+                            >
+                        </div>
+                    </div>
                 </div>
             </template>
         </Card>
@@ -649,3 +707,49 @@ function goBackFromNotFound() {
         </Confirmation>
     </template>
 </template>
+
+<style lang="scss" scoped>
+.student-card-schedule-panel {
+    position: relative;
+}
+
+.student-card-schedule-panel__action-anchor {
+    position: absolute;
+    top: 50%;
+    right: var(--panel-surface-padding, 1rem);
+    z-index: 2;
+    transform: translateY(-50%);
+}
+
+.student-card-schedule-panel__action-anchor :deep(.p-button) {
+    width: auto;
+    display: inline-flex;
+}
+
+.student-card-schedule-panel__grid {
+    min-width: 0;
+    padding-top: 2.75rem;
+}
+
+@media (min-width: 1024px) {
+    .student-card-schedule-panel__grid {
+        padding-top: 0;
+        padding-right: 11rem;
+    }
+}
+
+.student-card-schedule-panel__label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--p-text-muted-color, rgb(100 116 139));
+}
+
+.student-card-schedule-panel__value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--p-text-color);
+    word-break: break-word;
+}
+
+</style>
