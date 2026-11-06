@@ -443,7 +443,7 @@ function onCreateCardScan(uid) {
             <div
                 class="col-start-1 flex min-w-0 flex-nowrap items-center justify-self-start gap-x-2 sm:gap-x-3"
             >
-                <h1 class="shrink-0 text-xl font-bold leading-none sm:text-2xl">
+                <h1 class="text-2xl sm:text-3xl font-bold">
                     Students
                 </h1>
                 <div class="flex shrink-0 flex-nowrap items-center gap-2">
@@ -965,7 +965,7 @@ function onCreateCardScan(uid) {
                 />
             </div>
 
-            <div class="col-span-6">
+            <div class="col-span-6 mb-4">
                 <span class="block mb-3">Enrolled Subjects</span>
                 <div class="flex flex-wrap items-center gap-6">
                     <div class="flex items-center">

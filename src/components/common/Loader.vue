@@ -6,8 +6,12 @@ defineProps({
 </script>
 
 <template>
-    <div :class="compact ? 'text-center py-3' : 'text-center mt-12'">
+    <div
+        class="app-loader"
+        :class="compact ? 'text-center py-3' : 'text-center mt-12'"
+    >
         <ProgressSpinner
+            class="app-loader__spinner"
             :style="
                 compact
                     ? { width: '40px', height: '40px' }
@@ -18,4 +22,9 @@ defineProps({
     </div>
 </template>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+/* Theme primary is strong (often red in this app); keep loaders neutral. */
+.app-loader :deep(.p-progressspinner-circle) {
+    stroke: var(--p-text-muted-color, rgb(100 116 139));
+}
+</style>

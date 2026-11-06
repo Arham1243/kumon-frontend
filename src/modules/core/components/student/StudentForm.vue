@@ -15,6 +15,7 @@ import Card from 'primevue/card';
 import CardScanner from '@/components/common/CardScanner.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
 import Confirmation from '@/components/common/Confirmation.vue';
+import StudentPickerList from '@/modules/core/components/student/StudentPickerList.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -109,6 +110,23 @@ const assignOrReplaceCardButtonLabel = computed(() =>
 const cardManagementDisabled = computed(
     () => busy.value || statusBusy.value || !isActive.value
 );
+
+const studentSwitchDisabled = computed(
+    () => busy.value || statusBusy.value || cardAssignBusy.value
+);
+
+const pickerPatchRow = computed(() => {
+    const row = studentRecord.value;
+    if (!row?.uuid) {
+        return null;
+    }
+    return {
+        uuid: row.uuid,
+        name: row.name,
+        student_id: row.student_id,
+        status: row.status
+    };
+});
 
 const isActive = computed(() => !!studentRecord.value?.status);
 
@@ -250,13 +268,32 @@ function confirmLeave() {
     }
     mapRecordToForm(studentRecord.value);
     resetDirty(formData.value);
-    bypassLeaveGuard.value = true;
+    const leavesEditStudentRoute = destination.name !== 'EditStudent';
+    if (leavesEditStudentRoute) {
+        bypassLeaveGuard.value = true;
+    }
     router.push(destination);
 }
 
 function cancelLeave() {
     showUnsavedDialog.value = false;
     pendingLeaveTo.value = null;
+}
+
+function requestStudentSwitch(uuid) {
+    if (!uuid || uuid === studentUuid.value) {
+        return;
+    }
+    if (studentSwitchDisabled.value) {
+        return;
+    }
+    const target = { name: 'EditStudent', params: { uuid } };
+    if (!isDirty.value) {
+        router.push(target);
+        return;
+    }
+    pendingLeaveTo.value = target;
+    showUnsavedDialog.value = true;
 }
 
 function buildPayload() {
@@ -398,26 +435,45 @@ function goBackFromNotFound() {
 </script>
 
 <template>
-    <Loader v-if="loading" />
-    <template v-else-if="!studentRecord">
-        <div class="flex flex-col items-center justify-center gap-4 py-16">
-            <p class="text-lg text-muted-color">Student not found.</p>
-            <Button label="Back to Students" @click="goBackFromNotFound" />
-        </div>
-    </template>
-    <template v-else-if="studentRecord">
-        <TitleHeader>
-            <template #title>
-                <div class="flex flex-wrap items-center gap-5">
+    <div v-if="studentUuid" class="student-edit-split">
+        <aside class="student-edit-split__aside">
+            <StudentPickerList
+                :selected-uuid="String(studentUuid)"
+                :current-record="studentRecord"
+                :patch-row="pickerPatchRow"
+                :disabled="studentSwitchDisabled"
+                @select="requestStudentSwitch"
+            >
+                <template #headingBefore>
                     <Button
                         type="button"
                         variant="outlined"
                         icon="pi pi-chevron-left"
                         size="large"
-                        @click="goBack"
                         iconClass="!text-sm"
                         :disabled="busy"
+                        @click="goBack"
                     />
+                </template>
+            </StudentPickerList>
+        </aside>
+        <div class="student-edit-split__main">
+            <Loader v-if="loading" />
+            <template v-else-if="!studentRecord">
+                <div
+                    class="flex flex-col items-center justify-center gap-4 py-16"
+                >
+                    <p class="text-lg text-muted-color">Student not found.</p>
+                    <Button
+                        label="Back to Students"
+                        @click="goBackFromNotFound"
+                    />
+                </div>
+            </template>
+            <template v-else>
+        <TitleHeader align-top>
+            <template #title>
+                <div class="flex flex-wrap items-center gap-5">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-3">
                             <h1
@@ -499,7 +555,9 @@ function goBackFromNotFound() {
 
         <Card>
             <template #content>
-                <div class="grid grid-cols-1 gap-x-4 gap-y-4 lg:grid-cols-5">
+                <div
+                    class="grid grid-cols-1 items-stretch gap-x-4 gap-y-4 lg:grid-cols-3"
+                >
                     <div class="min-w-0">
                         <label class="required mb-2 block" for="student_edit_name"
                             >Name</label
@@ -588,40 +646,41 @@ function goBackFromNotFound() {
                             :disabled="busy"
                         />
                     </div>
-                </div>
-
-                <div class="mt-6">
-                    <span class="mb-3 block">Enrolled Subjects</span>
-                    <div class="flex flex-wrap items-center gap-6">
-                        <div class="flex items-center">
-                            <InputField
-                                variant="checkbox"
-                                v-model="formData.maths"
-                                binary
-                                inputId="student_edit_maths"
-                                :disabled="busy"
-                            />
-                            <label
-                                for="student_edit_maths"
-                                class="ml-2 cursor-pointer"
-                            >
-                                Maths
-                            </label>
-                        </div>
-                        <div class="flex items-center">
-                            <InputField
-                                variant="checkbox"
-                                v-model="formData.reading"
-                                binary
-                                inputId="student_edit_reading"
-                                :disabled="busy"
-                            />
-                            <label
-                                for="student_edit_reading"
-                                class="ml-2 cursor-pointer"
-                            >
-                                Reading
-                            </label>
+                    <div class="flex min-h-0 min-w-0 flex-col">
+                        <span class="mb-2 block shrink-0 mt-1">Enrolled Subjects</span>
+                        <div class="flex min-h-0 flex-1 flex-col mt-1">
+                            <div class="flex flex-wrap items-center gap-6 pb-px">
+                                <div class="flex items-center">
+                                    <InputField
+                                        variant="checkbox"
+                                        v-model="formData.maths"
+                                        binary
+                                        inputId="student_edit_maths"
+                                        :disabled="busy"
+                                    />
+                                    <label
+                                        for="student_edit_maths"
+                                        class="ml-2 cursor-pointer"
+                                    >
+                                        Maths
+                                    </label>
+                                </div>
+                                <div class="flex items-center">
+                                    <InputField
+                                        variant="checkbox"
+                                        v-model="formData.reading"
+                                        binary
+                                        inputId="student_edit_reading"
+                                        :disabled="busy"
+                                    />
+                                    <label
+                                        for="student_edit_reading"
+                                        class="ml-2 cursor-pointer"
+                                    >
+                                        Reading
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -706,7 +765,7 @@ function goBackFromNotFound() {
         <Confirmation
             v-model="showUnsavedDialog"
             header="Unsaved Changes"
-            content="You have unsaved changes. If you close, those changes will be lost. Do you want to discard them?"
+            content="You have unsaved changes. If you continue, those changes will be lost. Do you want to discard them?"
             variant="danger"
             confirmButtonText="Discard Changes"
             cancelButtonText="Keep Editing"
@@ -746,10 +805,70 @@ function goBackFromNotFound() {
                 />
             </div>
         </Confirmation>
-    </template>
+            </template>
+        </div>
+    </div>
 </template>
 
 <style lang="scss" scoped>
+.student-edit-split {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-height: 16rem;
+}
+
+.student-edit-split__aside {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+    flex-shrink: 0;
+    flex: 1 1 auto;
+}
+
+.student-edit-split__main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+@media (min-width: 1024px) {
+    .student-edit-split {
+        flex-direction: row;
+        align-items: stretch;
+        height: calc(100dvh - 8.5rem);
+        min-height: 0;
+        overflow: hidden;
+        gap: 1.5rem;
+    }
+
+    .student-edit-split__aside {
+        flex: 0 0 20%;
+        max-width: 20%;
+        min-height: 0;
+        height: 100%;
+    }
+
+    .student-edit-split__main {
+        flex: 1 1 0;
+        min-height: 0;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+    }
+}
+
+@media (max-width: 1023.98px) {
+    .student-edit-split__aside {
+        max-height: 18rem;
+        min-height: 12rem;
+    }
+}
+
 .student-card-schedule-panel {
     position: relative;
 }
@@ -787,7 +906,6 @@ function goBackFromNotFound() {
 }
 
 .student-card-schedule-panel__value {
-    font-size: 1.125rem;
     font-weight: 600;
     color: var(--p-text-color);
     word-break: break-word;
