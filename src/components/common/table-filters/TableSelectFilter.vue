@@ -17,6 +17,10 @@ defineProps({
     showClear: {
         type: Boolean,
         default: true
+    },
+    labelClass: {
+        type: String,
+        default: ''
     }
 });
 
@@ -35,6 +39,7 @@ const onChange = (value) => {
         placeholder="Select"
         class="w-full"
         inputClass="w-full"
+        :labelClass="labelClass"
         :showClear="showClear"
         @update:modelValue="onChange"
     />

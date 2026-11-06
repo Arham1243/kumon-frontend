@@ -1,5 +1,8 @@
 <script setup>
 import { computed, nextTick, onBeforeMount, ref, watch } from 'vue';
+import { FilterMatchMode } from '@primevue/core/api';
+import Checkbox from 'primevue/checkbox';
+import RadioButton from 'primevue/radiobutton';
 import { useStudentStore } from '@/modules/core/stores';
 import { useGlobalStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
@@ -17,8 +20,36 @@ import StatusTag from '@/components/common/StatusTag.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
 import Confirmation from '@/components/common/Confirmation.vue';
 import dayjs from '@/plugins/dayjs';
+import { isCompleteDateRange } from '@/utils/dateRangePresets';
 
 const helpers = useHelpers();
+
+/**
+ * Match Attendance filter buttons: compact circular count badges.
+ */
+const STU_COUNT_BADGE_BASE =
+    'inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border text-center text-[9px] font-bold tabular-nums leading-none shadow-sm';
+const STU_BADGE_ACTIVE_ON = `${STU_COUNT_BADGE_BASE} border-white/80 bg-white text-emerald-900 dark:border-emerald-200/30 dark:bg-emerald-950 dark:text-emerald-50`;
+const STU_BADGE_ACTIVE_OFF = `${STU_COUNT_BADGE_BASE} border-emerald-600/25 bg-emerald-600/25 text-emerald-950 dark:border-emerald-400/35 dark:bg-emerald-400/20 dark:text-emerald-50`;
+const STU_BADGE_INACTIVE_ON = `${STU_COUNT_BADGE_BASE} border-white/80 bg-white text-rose-950 dark:border-rose-200/30 dark:bg-rose-950 dark:text-rose-50`;
+const STU_BADGE_INACTIVE_OFF = `${STU_COUNT_BADGE_BASE} border-rose-600/25 bg-rose-600/25 text-rose-950 dark:border-rose-400/35 dark:bg-rose-400/20 dark:text-rose-50`;
+
+const FILTER_CB_WRAP_ACTIVE =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-emerald-300 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-emerald-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-emerald-600 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-emerald-950/30 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-emerald-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-emerald-800 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-emerald-500';
+const FILTER_CB_WRAP_INACTIVE =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-rose-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-rose-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-rose-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-rose-950/40 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-rose-900 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-rose-500';
 
 function disableFutureEndDate(date) {
     return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
@@ -42,6 +73,21 @@ const deactivateEndDate = ref(null);
 const showAssignCardDialog = ref(false);
 const cardAssignBusy = ref(false);
 const assignCardEnabled = ref(false);
+const assignCardFlowStarted = ref(false);
+const activeCount = ref(0);
+const inactiveCount = ref(0);
+const loadingSummary = ref(false);
+
+/** Date range filter (applied on arrow click; preserved when column filters sync). */
+const DATE_RANGE_FILTER_KEYS = ['start_date', 'end_date'];
+const dateRangeForRun = ref([null, null]);
+const appliedDateRange = ref([]);
+const studentDateRangeMode = ref('start_date');
+
+function startAssignCardFlow() {
+    assignCardFlowStarted.value = true;
+    assignCardEnabled.value = true;
+}
 const assignCardStubForm = ref({ _assignCard: true });
 const assigningId = ref(false);
 const previewStudentId = ref('');
@@ -100,17 +146,43 @@ function trimCardUid(value) {
     return String(value ?? '').trim();
 }
 
+function defaultSortPayload() {
+    return [
+        { field: 'status', direction: 'desc' },
+        { field: 'name', direction: 'asc' }
+    ];
+}
+
+function mergeDateRangeIntoPayload(payload) {
+    const next = { ...payload, filters: [...(payload.filters || [])] };
+    const withoutRange = next.filters.filter(
+        (f) => !DATE_RANGE_FILTER_KEYS.includes(f.field)
+    );
+    next.filters = withoutRange;
+
+    if (!isCompleteDateRange(appliedDateRange.value)) {
+        return next;
+    }
+
+    const field =
+        studentDateRangeMode.value === 'end_date' ? 'end_date' : 'start_date';
+    next.filters.push({
+        field,
+        operator: 'between',
+        value: [...appliedDateRange.value]
+    });
+    return next;
+}
+
 async function getItems() {
     try {
         loading.value = true;
         const params = { ...pagination.getPageParams() };
-        const payload = sortFilters.getSortFilters();
+        let payload = sortFilters.getSortFilters();
         if (!payload.sort || payload.sort.length === 0) {
-            payload.sort = [
-                { field: 'status', direction: 'desc' },
-                { field: 'name', direction: 'asc' }
-            ];
+            payload.sort = defaultSortPayload();
         }
+        payload = mergeDateRangeIntoPayload(payload);
         const res = await studentStore.search(payload, params);
         items.value = res.data;
         totalRecords.value = res.meta.total;
@@ -119,15 +191,99 @@ async function getItems() {
     }
 }
 
-const { primeFilters, onColumnFilter } = useTableColumnFilters({
-    columnConfigs: filterColumnConfigs,
-    sortFilters,
-    pagination,
-    refetch: getItems
+const { primeFilters, onColumnFilter, applyColumnFilters } =
+    useTableColumnFilters({
+        columnConfigs: filterColumnConfigs,
+        sortFilters,
+        pagination,
+        refetch: getItems,
+        preserveFilters: DATE_RANGE_FILTER_KEYS
+    });
+
+async function applyStudentDateFilter() {
+    appliedDateRange.value = isCompleteDateRange(dateRangeForRun.value)
+        ? [...dateRangeForRun.value]
+        : [];
+    pagination.resetPageParams();
+    await getItems();
+}
+
+const statusFilterValue = computed(() => {
+    const raw = primeFilters.value?.status?.value;
+    if (raw === true || raw === false) {
+        return raw;
+    }
+    return null;
 });
 
+function setStatusFilterValue(next) {
+    const meta = primeFilters.value?.status;
+    if (!meta) {
+        return;
+    }
+    if (next === null || next === undefined) {
+        meta.value = null;
+        meta.matchMode = FilterMatchMode.EQUALS;
+    } else {
+        meta.value = next;
+        meta.matchMode = FilterMatchMode.EQUALS;
+    }
+}
+
+function toggleActiveFilter() {
+    if (statusFilterValue.value === true) {
+        setStatusFilterValue(null);
+    } else {
+        setStatusFilterValue(true);
+    }
+    applyColumnFilters();
+}
+
+function toggleInactiveFilter() {
+    if (statusFilterValue.value === false) {
+        setStatusFilterValue(null);
+    } else {
+        setStatusFilterValue(false);
+    }
+    applyColumnFilters();
+}
+
+async function refreshStatusCounts() {
+    try {
+        loadingSummary.value = true;
+        const countParams = { page: 1, limit: 1 };
+        const payloadBase = {
+            search: { value: '' },
+            sort: defaultSortPayload(),
+            filters: []
+        };
+        const [activeRes, inactiveRes] = await Promise.all([
+            studentStore.search(
+                {
+                    ...payloadBase,
+                    filters: [{ field: 'status', operator: '=', value: true }]
+                },
+                countParams
+            ),
+            studentStore.search(
+                {
+                    ...payloadBase,
+                    filters: [{ field: 'status', operator: '=', value: false }]
+                },
+                countParams
+            )
+        ]);
+        activeCount.value = activeRes.meta?.total ?? 0;
+        inactiveCount.value = inactiveRes.meta?.total ?? 0;
+    } catch (error) {
+        console.error(error);
+    } finally {
+        loadingSummary.value = false;
+    }
+}
+
 onBeforeMount(async () => {
-    await getItems();
+    await Promise.all([getItems(), refreshStatusCounts()]);
 });
 
 const menuItems = computed(() => {
@@ -222,6 +378,7 @@ const closeAssignCardDialog = () => {
 watch(assignCardEnabled, (enabled) => {
     if (!enabled) {
         formData.value.card_uid = '';
+        assignCardFlowStarted.value = false;
     }
 });
 
@@ -280,6 +437,7 @@ function isAddFormUntouched() {
 }
 
 const resetForm = () => {
+    assignCardFlowStarted.value = false;
     assignCardEnabled.value = false;
     formData.value = {
         name: '',
@@ -368,7 +526,7 @@ const save = async () => {
             await studentStore.create(payload);
         }
         closeDialog();
-        await getItems();
+        await Promise.all([getItems(), refreshStatusCounts()]);
         selectedItem.value = null;
     } catch (error) {
         console.error(error);
@@ -389,7 +547,7 @@ async function onAssignCardScan(uid) {
             isReplace
         });
         closeAssignCardDialog();
-        await getItems();
+        await Promise.all([getItems(), refreshStatusCounts()]);
         selectedItem.value = null;
     } catch (error) {
         console.error(error);
@@ -418,7 +576,7 @@ const changeStatus = async () => {
         }
         changeStatusDialog.value = false;
         deactivateEndDate.value = null;
-        await getItems();
+        await Promise.all([getItems(), refreshStatusCounts()]);
         selectedItem.value = null;
     } finally {
         loading.value = false;
@@ -427,26 +585,209 @@ const changeStatus = async () => {
 </script>
 
 <template>
-    <TitleHeader>
-        <template #title>
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-bold">Students</h1>
+    <div class="mb-7 w-full min-w-0">
+        <div
+            class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-3 gap-y-2 overflow-x-auto pb-0.5 sm:gap-x-4"
+        >
+            <div
+                class="col-start-1 flex min-w-0 flex-wrap items-end gap-x-3 gap-y-2 sm:gap-x-4"
+            >
+                <h1 class="shrink-0 text-2xl font-bold sm:text-3xl">
+                    Students
+                </h1>
+                <div class="flex shrink-0 flex-nowrap items-end gap-2">
+                    <Button
+                        type="button"
+                        :severity="
+                            statusFilterValue === true ? 'success' : undefined
+                        "
+                        :variant="
+                            statusFilterValue === true ? undefined : 'outlined'
+                        "
+                        :class="[
+                            '!items-center',
+                            statusFilterValue === true
+                                ? undefined
+                                : '!bg-emerald-50 !border-emerald-300 !text-emerald-900 hover:!bg-emerald-100 dark:!bg-emerald-950/30 dark:!border-emerald-600 dark:!text-emerald-50'
+                        ]"
+                        :disabled="loading || loadingSummary"
+                        :aria-pressed="statusFilterValue === true"
+                        aria-label="Filter by active students"
+                        @click="toggleActiveFilter"
+                    >
+                        <span
+                            class="inline-flex items-center justify-center gap-2 leading-none"
+                        >
+                            <span
+                                class="pointer-events-none inline-flex shrink-0 items-center self-center"
+                                :class="FILTER_CB_WRAP_ACTIVE"
+                                aria-hidden="true"
+                            >
+                                <Checkbox
+                                    :model-value="statusFilterValue === true"
+                                    binary
+                                    readonly
+                                    :disabled="loading || loadingSummary"
+                                    :tabindex="-1"
+                                />
+                            </span>
+                            <span class="self-center leading-none">Active</span>
+                            <span
+                                class="self-center"
+                                :class="
+                                    statusFilterValue === true
+                                        ? STU_BADGE_ACTIVE_ON
+                                        : STU_BADGE_ACTIVE_OFF
+                                "
+                                aria-hidden="true"
+                            >
+                                {{ activeCount }}
+                            </span>
+                        </span>
+                    </Button>
+                    <Button
+                        type="button"
+                        :severity="
+                            statusFilterValue === false ? 'danger' : undefined
+                        "
+                        :variant="
+                            statusFilterValue === false ? undefined : 'outlined'
+                        "
+                        :class="[
+                            '!items-center',
+                            statusFilterValue === false
+                                ? undefined
+                                : '!bg-rose-50 !border-rose-300 !text-rose-900 hover:!bg-rose-100 dark:!bg-rose-950/40 dark:!border-rose-600 dark:!text-rose-50'
+                        ]"
+                        :disabled="loading || loadingSummary"
+                        :aria-pressed="statusFilterValue === false"
+                        aria-label="Filter by inactive students"
+                        @click="toggleInactiveFilter"
+                    >
+                        <span
+                            class="inline-flex items-center justify-center gap-2 leading-none"
+                        >
+                            <span
+                                class="pointer-events-none inline-flex shrink-0 items-center self-center"
+                                :class="FILTER_CB_WRAP_INACTIVE"
+                                aria-hidden="true"
+                            >
+                                <Checkbox
+                                    :model-value="statusFilterValue === false"
+                                    binary
+                                    readonly
+                                    :disabled="loading || loadingSummary"
+                                    :tabindex="-1"
+                                />
+                            </span>
+                            <span class="self-center leading-none"
+                                >Inactive</span
+                            >
+                            <span
+                                class="self-center"
+                                :class="
+                                    statusFilterValue === false
+                                        ? STU_BADGE_INACTIVE_ON
+                                        : STU_BADGE_INACTIVE_OFF
+                                "
+                                aria-hidden="true"
+                            >
+                                {{ inactiveCount }}
+                            </span>
+                        </span>
+                    </Button>
+                </div>
             </div>
-        </template>
-        <template #actions>
-            <Button
-                v-if="$ability.can('core.students.create')"
-                label="Add New"
-                icon="pi pi-plus"
-                @click="openDialog('add')"
-            />
-        </template>
-    </TitleHeader>
+            <div class="col-start-2 shrink-0 justify-self-center px-1 sm:px-2">
+                <div
+                    class="w-fit max-w-full shrink-0 rounded-xl border border-surface-200 bg-surface-0 px-3 py-3 shadow-sm dark:border-surface-600"
+                >
+                    <div
+                        class="purchase-return-search__row flex w-auto max-w-full flex-nowrap items-end gap-3 overflow-x-auto sm:gap-4 min-[1100px]:gap-6"
+                    >
+                        <div
+                            class="purchase-return-search__field w-[min(100%,17.5rem)] shrink-0 sm:w-[18rem]"
+                        >
+                            <label
+                                class="datatable-column-header-text mb-2 block"
+                                for="student_filter_date_range"
+                            >
+                                Date range
+                            </label>
+                            <InputField
+                                id="student_filter_date_range"
+                                v-model="dateRangeForRun"
+                                variant="date"
+                                :range="true"
+                                class="w-full"
+                                :disabled="loading || loadingSummary"
+                                placeholder="Select"
+                            />
+                        </div>
+                        <div class="purchase-return-search__field shrink-0">
+                            <span class="datatable-column-header-text mb-2 block"
+                                >Filter by</span
+                            >
+                            <div class="flex flex-col gap-2">
+                                <div class="inline-flex items-center gap-2">
+                                    <RadioButton
+                                        v-model="studentDateRangeMode"
+                                        input-id="student-date-range-start"
+                                        value="start_date"
+                                        :disabled="loading || loadingSummary"
+                                    />
+                                    <label
+                                        class="cursor-pointer text-sm leading-none text-surface-800 dark:text-surface-100"
+                                        for="student-date-range-start"
+                                        >Started at</label
+                                    >
+                                </div>
+                                <div class="inline-flex items-center gap-2">
+                                    <RadioButton
+                                        v-model="studentDateRangeMode"
+                                        input-id="student-date-range-end"
+                                        value="end_date"
+                                        :disabled="loading || loadingSummary"
+                                    />
+                                    <label
+                                        class="cursor-pointer text-sm leading-none text-surface-800 dark:text-surface-100"
+                                        for="student-date-range-end"
+                                        >Left at</label
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            icon="pi pi-arrow-right"
+                            rounded
+                            class="shrink-0"
+                            aria-label="Apply date range filter"
+                            :disabled="loading || loadingSummary"
+                            :loading="loading"
+                            @click="applyStudentDateFilter"
+                        />
+                    </div>
+                </div>
+            </div>
+            <div class="col-start-3 flex min-w-0 justify-end">
+                <Button
+                    v-if="$ability.can('core.students.create')"
+                    label="Add New"
+                    icon="pi pi-plus"
+                    class="shrink-0"
+                    @click="openDialog('add')"
+                />
+            </div>
+        </div>
+    </div>
 
     <Card class="py-3 px-2">
         <template #content>
             <BaseTable
+                class="students-table-columns"
                 :reorderableColumns="true"
+                columnResizeMode="fit"
                 :value="items"
                 :page="pagination.page"
                 :rows="pagination.limit"
@@ -466,6 +807,9 @@ const changeStatus = async () => {
                     header="Student ID"
                     :showFilterMenu="false"
                     filterField="student_id"
+                    filterHeaderClass="min-w-0 overflow-hidden"
+                    headerClass="student-id-column whitespace-nowrap"
+                    bodyClass="student-id-column whitespace-nowrap"
                 >
                     <template #filter="{ filterModel, filterCallback }">
                         <TableColumnFilter
@@ -476,13 +820,14 @@ const changeStatus = async () => {
                     </template>
                     <template #body="{ data }">
                         <span
+                            class="block w-max max-w-full overflow-hidden text-ellipsis"
                             v-tooltip.top="
-                                data.student_id?.length > 30
+                                data.student_id?.length > 12
                                     ? data.student_id
                                     : undefined
                             "
                         >
-                            {{ truncate(data.student_id, { length: 30 }) }}
+                            {{ truncate(data.student_id, { length: 12 }) }}
                         </span>
                     </template>
                 </Column>
@@ -494,6 +839,11 @@ const changeStatus = async () => {
                     header="Name"
                     :showFilterMenu="false"
                     filterField="name"
+                    filterHeaderClass="min-w-0 overflow-hidden"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
+                    :headerStyle="{ minWidth: '15rem' }"
+                    :style="{ minWidth: '15rem' }"
                 >
                     <template #filter="{ filterModel, filterCallback }">
                         <TableColumnFilter
@@ -511,9 +861,12 @@ const changeStatus = async () => {
                     columnKey="parent_1_mobile"
                     :sortable="true"
                     field="parent_1_mobile"
-                    header="Parent 1 Mobile"
+                    header="Parent 1 Mobile No."
                     :showFilterMenu="false"
                     filterField="parent_1_mobile"
+                    filterHeaderClass="min-w-0 overflow-hidden"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
                 >
                     <template #filter="{ filterModel, filterCallback }">
                         <TableColumnFilter
@@ -531,9 +884,12 @@ const changeStatus = async () => {
                     columnKey="parent_2_mobile"
                     :sortable="true"
                     field="parent_2_mobile"
-                    header="Parent 2 Mobile"
+                    header="Parent 2 Mobile No."
                     :showFilterMenu="false"
                     filterField="parent_2_mobile"
+                    filterHeaderClass="min-w-0 overflow-hidden"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
                 >
                     <template #filter="{ filterModel, filterCallback }">
                         <TableColumnFilter
@@ -553,6 +909,8 @@ const changeStatus = async () => {
                     field="start_date"
                     header="Start Date"
                     :showFilterMenu="false"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
                 >
                     <template #body="{ data }">
                         {{
@@ -563,29 +921,62 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
-            
                 <Column
-                    columnKey="enrolled_subjects"
-                    header="Enrolled Subjects"
+                    columnKey="maths_enrolled"
+                    :sortable="true"
+                    field="maths"
+                    header="Maths"
                     :showFilterMenu="false"
+                    headerClass="header-center-subject whitespace-nowrap text-center"
+                    bodyClass="whitespace-nowrap text-center"
                 >
                     <template #body="{ data }">
-                        <div
-                            v-if="data.maths || data.reading"
-                            class="flex flex-wrap items-center gap-1"
+                        <span
+                            v-if="data.maths"
+                            class="inline-flex w-full justify-center"
                         >
-                            <StatusTag v-if="data.maths" status="maths" />
-                            <StatusTag v-if="data.reading" status="reading" />
-                        </div>
-                        <span v-else>-</span>
+                            <span
+                                class="inline-block pt-px text-[17px] font-bold leading-none text-green-700"
+                                aria-hidden="true"
+                            >
+                                ✔
+                            </span>
+                        </span>
                     </template>
                 </Column>
+
+                <Column
+                    columnKey="reading_enrolled"
+                    :sortable="true"
+                    field="reading"
+                    header="Reading"
+                    :showFilterMenu="false"
+                    headerClass="header-center-subject whitespace-nowrap text-center"
+                    bodyClass="whitespace-nowrap text-center"
+                >
+                    <template #body="{ data }">
+                        <span
+                            v-if="data.reading"
+                            class="inline-flex w-full justify-center"
+                        >
+                            <span
+                                class="inline-block pt-px text-[17px] font-bold leading-none text-green-700"
+                                aria-hidden="true"
+                            >
+                                ✔
+                            </span>
+                        </span>
+                    </template>
+                </Column>
+
                 <Column
                     columnKey="end_date"
                     :sortable="true"
                     field="end_date"
                     header="End Date"
                     :showFilterMenu="false"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
                 >
                     <template #body="{ data }">
                         {{
@@ -596,7 +987,6 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
-                
                 <Column
                     columnKey="status"
                     :sortable="true"
@@ -604,13 +994,18 @@ const changeStatus = async () => {
                     header="Status"
                     :showFilterMenu="false"
                     filterField="status"
+                    filterHeaderClass="min-w-0 overflow-visible"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap"
                 >
                     <template #filter="{ filterModel, filterCallback }">
                         <TableColumnFilter
                             v-model="filterModel.value"
                             :config="{
                                 ...ROLE_STATUS_FILTER,
-                                defaultValue: true
+                                defaultValue: true,
+                                labelClass:
+                                    '!overflow-visible !whitespace-normal !text-clip'
                             }"
                             @apply="filterCallback()"
                         />
@@ -622,12 +1017,12 @@ const changeStatus = async () => {
                     </template>
                 </Column>
 
-         
                 <Column
                     columnKey="actions"
                     v-if="$ability.can('core.students.edit')"
                     header="Actions"
-                    class="flex justify-end"
+                    headerClass="whitespace-nowrap"
+                    bodyClass="whitespace-nowrap text-right"
                 >
                     <template #body="{ data }">
                         <Button
@@ -663,10 +1058,11 @@ const changeStatus = async () => {
         :busy="busy"
         :isEditMode="isEditMode"
         :header="dialogHeader"
-        :confirmLabel="isEditMode ? 'Update' : 'Save'"
+        :confirmLabel="isEditMode ? 'Update Student' : 'Create Student'"
         :formData="formData"
         :initialData="isEditMode ? selectedItem : null"
         :enableDirtyCheck="true"
+        :hideCancelButton="true"
         :confirmBeforeSave="false"
         :disableConfirm="
             assigningId ||
@@ -689,29 +1085,6 @@ const changeStatus = async () => {
                 />
             </div>
             <div class="col-span-6">
-                <label class="block mb-2" for="tuition_fee">
-                    Tuition Fee
-                    <span class="text-sm font-normal text-muted-color">
-                        (Do not include one time charges)
-                    </span>
-                </label>
-                <InputField
-                    variant="number"
-                    id="tuition_fee"
-                    errorKey="tuition_fee"
-                    v-model="formData.tuition_fee"
-                    class="w-full text-right-input"
-                    inputClass="w-full text-right"
-                    :prefix="helpers.currencyInputPrefix()"
-                    :min="0"
-                    :max="999999999.99"
-                    :minFractionDigits="2"
-                    :maxFractionDigits="2"
-                    :disabled="busy"
-                />
-            </div>
-
-            <div class="col-span-6">
                 <label class="block required mb-2" for="start_date">
                     Start Date
                 </label>
@@ -725,6 +1098,42 @@ const changeStatus = async () => {
                     placeholder="Select"
                     v-model="formData.start_date"
                     class="w-full"
+                    :disabled="busy"
+                />
+            </div>
+
+            <div class="col-span-6">
+                <label class="block mb-2" for="parent_1_mobile">
+                    Parent 1 Mobile Number
+                    <span class="text-sm font-normal text-muted-color">
+                        (for text messaging)
+                    </span>
+                </label>
+                <InputField
+                    variant="text"
+                    id="parent_1_mobile"
+                    errorKey="parent_1_mobile"
+                    v-model="formData.parent_1_mobile"
+                    class="w-full"
+                    maxlength="32"
+                    :disabled="busy"
+                />
+            </div>
+
+            <div class="col-span-6">
+                <label class="block mb-2" for="parent_2_mobile">
+                    Parent 2 Mobile Number
+                    <span class="text-sm font-normal text-muted-color">
+                        (for text messaging)
+                    </span>
+                </label>
+                <InputField
+                    variant="text"
+                    id="parent_2_mobile"
+                    errorKey="parent_2_mobile"
+                    v-model="formData.parent_2_mobile"
+                    class="w-full"
+                    maxlength="32"
                     :disabled="busy"
                 />
             </div>
@@ -762,37 +1171,46 @@ const changeStatus = async () => {
                 </div>
             </div>
 
-            <div class="col-span-6 mt-1">
-                <label class="block mb-2" for="parent_1_mobile">
-                    Parent 1 Mobile Number
+            <div class="col-span-6">
+                <label class="block mb-2" for="tuition_fee">
+                    Tuition Fee
+                    <span class="text-sm font-normal text-muted-color">
+                        (Do not include one time charges)
+                    </span>
                 </label>
                 <InputField
-                    variant="text"
-                    id="parent_1_mobile"
-                    errorKey="parent_1_mobile"
-                    v-model="formData.parent_1_mobile"
-                    class="w-full"
-                    maxlength="32"
+                    variant="number"
+                    id="tuition_fee"
+                    errorKey="tuition_fee"
+                    v-model="formData.tuition_fee"
+                    class="w-full text-right-input"
+                    inputClass="w-full text-right"
+                    :prefix="helpers.currencyInputPrefix()"
+                    :min="0"
+                    :max="999999999.99"
+                    :minFractionDigits="2"
+                    :maxFractionDigits="2"
                     :disabled="busy"
                 />
             </div>
 
-            <div class="col-span-6 mt-1">
-                <label class="block mb-2" for="parent_2_mobile">
-                    Parent 2 Mobile Number
-                </label>
-                <InputField
-                    variant="text"
-                    id="parent_2_mobile"
-                    errorKey="parent_2_mobile"
-                    v-model="formData.parent_2_mobile"
-                    class="w-full"
-                    maxlength="32"
+            <div
+                v-if="!isEditMode && !assignCardFlowStarted"
+                class="col-span-12 mt-3 flex justify-center"
+            >
+                <Button
+                    type="button"
+                    label="Assign Card"
+                    severity="primary"
                     :disabled="busy"
+                    @click="startAssignCardFlow"
                 />
             </div>
 
-            <div v-if="!isEditMode" class="col-span-12">
+            <div
+                v-if="!isEditMode && assignCardFlowStarted"
+                class="col-span-12 mt-3"
+            >
                 <label class="block mb-2" for="assign_card_switch">
                     Assign Card
                 </label>
@@ -871,3 +1289,36 @@ const changeStatus = async () => {
         </div>
     </Confirmation>
 </template>
+
+<style scoped>
+.students-table-columns :deep(.p-datatable-column-header-content) {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.students-table-columns :deep(.p-datatable-column-title) {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.students-table-columns :deep(.p-datatable-sort) {
+    flex-shrink: 0;
+}
+
+.students-table-columns :deep(th.header-center-subject .p-datatable-column-header-content) {
+    justify-content: center;
+}
+
+/* Narrow column: size to header + sort icon + filter, not stretched */
+.students-table-columns :deep(th.student-id-column),
+.students-table-columns :deep(td.student-id-column) {
+    width: 1%;
+    max-width: max-content;
+}
+</style>

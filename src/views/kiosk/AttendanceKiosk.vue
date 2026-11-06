@@ -13,6 +13,8 @@ import {
 import { useCardReader } from '@/composables';
 import Loader from '@/components/common/Loader.vue';
 import KioskCelebration from '@/views/kiosk/KioskCelebration.vue';
+import KioskErrorScreen from '@/views/kiosk/KioskErrorScreen.vue';
+import { pickCelebrationIndices } from '@/views/kiosk/kioskCelebrationSvg';
 
 const route = useRoute();
 
@@ -30,9 +32,16 @@ const company = ref(null);
 const studentIdInput = ref('');
 const inputRef = ref(null);
 const busy = ref(false);
-const statusMessage = ref('');
-const statusTone = ref('notice');
-const statusVisible = ref(false);
+const errorOverlayVisible = ref(false);
+const errorScene = ref('notFound');
+const errorMessage = ref('');
+const errorSubline = ref('');
+const errorHeadline = ref('');
+const errorPillText = ref('');
+const errorFlashKey = ref(0);
+const celebrationThemeIndex = ref(-1);
+const celebrationAnimalIndex = ref(0);
+const offlineKioskOverlay = ref(false);
 const successCheckVisible = ref(false);
 const successStudentName = ref('');
 const successMode = ref('in');
@@ -42,16 +51,9 @@ let successCheckTimer = null;
 let clockTimer = null;
 
 const SUCCESS_CODES = new Set(['checked_in', 'checked_out']);
-const NOTICE_CODES = new Set([
-    'wait_before_checkout',
-    'attendance_complete'
-]);
-const ERROR_CODES = new Set([
-    'invalid_student_id',
-    'card_not_registered',
-    'unable_to_record',
-    'rate_limited'
-]);
+/** How long the celebration overlay stays visible after a successful punch. */
+const SUCCESS_DISPLAY_MS_CHECK_IN = 4000;
+const SUCCESS_DISPLAY_MS_CHECK_OUT = 2000;
 const now = ref(dayjs());
 
 const formatMap = {
@@ -93,6 +95,70 @@ const STATUS_MESSAGES = {
     rate_limited: 'Too many attempts. Please wait a moment.'
 };
 
+const WAIT_LINE_ONE = "You're checked in.";
+const WAIT_LINE_TWO =
+    'Please wait at least one minute before checking out.';
+const OFFLINE_LINE_ONE = 'No internet';
+const OFFLINE_LINE_TWO = 'right now';
+const OFFLINE_PILL = 'Please tell a teacher';
+
+const LOAD_FAILURE_MESSAGES = {
+    not_found: 'This page is not available.',
+    error: 'Something went wrong.',
+    offline: `${OFFLINE_LINE_ONE} ${OFFLINE_LINE_TWO}`
+};
+
+function statusCodeToScene(code) {
+    if (
+        code === 'invalid_student_id' ||
+        code === 'card_not_registered'
+    ) {
+        return 'notFound';
+    }
+    if (code === 'wait_before_checkout') {
+        return 'alreadyIn';
+    }
+    if (code === 'attendance_complete') {
+        return 'alreadyOut';
+    }
+    return 'serverError';
+}
+
+function isBrowserOffline() {
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+function isNetworkFailure(err) {
+    if (isBrowserOffline()) {
+        return true;
+    }
+    if (!err || err.response) {
+        return false;
+    }
+    const code = String(err.code ?? '').toUpperCase();
+    if (code === 'ERR_NETWORK') {
+        return true;
+    }
+    const msg = String(err.message ?? '');
+    return msg === 'Network Error';
+}
+
+const loadFailureScene = computed(() => {
+    if (loadFailure.value === 'offline') {
+        return 'offline';
+    }
+    if (loadFailure.value === 'not_found') {
+        return 'notFound';
+    }
+    return 'serverError';
+});
+
+const loadFailureMessage = computed(() => LOAD_FAILURE_MESSAGES[loadFailure.value] ?? '');
+
+const loadFailurePillText = computed(() =>
+    loadFailure.value === 'offline' ? OFFLINE_PILL : ''
+);
+
 const { readerStatus, onCard } = useCardReader({ enabled: isCardMode });
 
 const readerConnected = computed(
@@ -103,7 +169,8 @@ const showIdleHint = computed(
     () =>
         !busy.value &&
         !successCheckVisible.value &&
-        !statusVisible.value
+        !errorOverlayVisible.value &&
+        !offlineKioskOverlay.value
 );
 
 const canAcceptTap = computed(
@@ -112,20 +179,22 @@ const canAcceptTap = computed(
         !loadFailure.value &&
         !!company.value &&
         !successCheckVisible.value &&
-        !statusVisible.value
+        !errorOverlayVisible.value &&
+        !offlineKioskOverlay.value
 );
 
-function resolveStatusTone(code) {
-    if (NOTICE_CODES.has(code)) {
-        return 'notice';
-    }
-    if (ERROR_CODES.has(code)) {
-        return 'error';
-    }
-    return 'notice';
+function clearErrorCopy() {
+    errorMessage.value = '';
+    errorSubline.value = '';
+    errorHeadline.value = '';
+    errorPillText.value = '';
+    celebrationThemeIndex.value = -1;
+    celebrationAnimalIndex.value = 0;
 }
 
-function showSuccessCheck(code, studentName, displayMs = 2000) {
+function showSuccessCheck(code, studentName, displayMs = SUCCESS_DISPLAY_MS_CHECK_IN) {
+    clearErrorCopy();
+    offlineKioskOverlay.value = false;
     successStudentName.value = String(studentName ?? '').trim();
     successMode.value = code === 'checked_out' ? 'out' : 'in';
     successFlashKey.value += 1;
@@ -143,24 +212,56 @@ function showSuccessCheck(code, studentName, displayMs = 2000) {
 
 function showStatus(code, studentName = '', displayMs = 4000) {
     if (SUCCESS_CODES.has(code)) {
-        statusVisible.value = false;
-        showSuccessCheck(code, studentName, displayMs === 4000 ? 2000 : displayMs);
+        errorOverlayVisible.value = false;
+        clearErrorCopy();
+        let successMs = displayMs;
+        if (displayMs === 4000) {
+            successMs =
+                code === 'checked_out'
+                    ? SUCCESS_DISPLAY_MS_CHECK_OUT
+                    : SUCCESS_DISPLAY_MS_CHECK_IN;
+        }
+        showSuccessCheck(code, studentName, successMs);
         return;
     }
 
     successStudentName.value = '';
+    offlineKioskOverlay.value = false;
 
-    statusMessage.value = STATUS_MESSAGES[code] ?? STATUS_MESSAGES.unable_to_record;
-    statusTone.value = resolveStatusTone(
-        STATUS_MESSAGES[code] ? code : 'unable_to_record'
-    );
-    statusVisible.value = true;
+    const effectiveCode = STATUS_MESSAGES[code] ? code : 'unable_to_record';
+    errorScene.value = statusCodeToScene(effectiveCode);
+    clearErrorCopy();
+
+    if (effectiveCode === 'wait_before_checkout') {
+        const trimmedName = String(studentName ?? '').trim();
+        errorHeadline.value = trimmedName || 'Friend';
+        errorMessage.value = WAIT_LINE_ONE;
+        errorSubline.value = WAIT_LINE_TWO;
+    } else if (effectiveCode === 'attendance_complete') {
+        const trimmedName = String(studentName ?? '').trim();
+        errorHeadline.value = trimmedName || 'Friend';
+        errorMessage.value = "You're already";
+        errorSubline.value = 'checked out for today.';
+        errorPillText.value = '';
+        const pick = pickCelebrationIndices(true);
+        celebrationThemeIndex.value = pick.themeIndex;
+        celebrationAnimalIndex.value = pick.animalIndex;
+    } else {
+        errorMessage.value = STATUS_MESSAGES[effectiveCode];
+    }
+
+    errorFlashKey.value += 1;
+    errorOverlayVisible.value = true;
     successCheckVisible.value = false;
     if (statusTimer) {
         clearTimeout(statusTimer);
     }
-    statusTimer = setTimeout(() => {
-        statusVisible.value = false;
+    statusTimer = setTimeout(async () => {
+        errorOverlayVisible.value = false;
+        clearErrorCopy();
+        if (isIdMode.value) {
+            await focusInput();
+        }
     }, displayMs);
 }
 
@@ -173,6 +274,7 @@ async function loadCompany() {
     loading.value = true;
     loadFailure.value = null;
     company.value = null;
+    offlineKioskOverlay.value = false;
 
     if (!isKioskCompanyUuid(companyUuid.value)) {
         loadFailure.value = 'not_found';
@@ -180,11 +282,19 @@ async function loadCompany() {
         return;
     }
 
+    if (isBrowserOffline()) {
+        loading.value = false;
+        loadFailure.value = 'offline';
+        return;
+    }
+
     try {
         const res = await fetchKioskCompany(companyUuid.value);
         company.value = parseKioskCompanyResponse(res);
     } catch (err) {
-        if (err.response?.status === 404) {
+        if (isNetworkFailure(err)) {
+            loadFailure.value = 'offline';
+        } else if (err.response?.status === 404) {
             loadFailure.value = 'not_found';
         } else {
             loadFailure.value = 'error';
@@ -198,7 +308,26 @@ async function loadCompany() {
     }
 }
 
+function showOfflineKioskError() {
+    if (statusTimer) {
+        clearTimeout(statusTimer);
+        statusTimer = null;
+    }
+    errorOverlayVisible.value = false;
+    offlineKioskOverlay.value = true;
+    errorScene.value = 'offline';
+    clearErrorCopy();
+    errorMessage.value = OFFLINE_LINE_ONE;
+    errorSubline.value = OFFLINE_LINE_TWO;
+    errorPillText.value = OFFLINE_PILL;
+    errorFlashKey.value += 1;
+}
+
 function handlePunchError(err) {
+    if (isNetworkFailure(err)) {
+        showOfflineKioskError();
+        return;
+    }
     if (err.code === 'kiosk_bad_response') {
         loadFailure.value = 'error';
         company.value = null;
@@ -230,12 +359,25 @@ function applyPunchResult(result) {
 async function submitPunch() {
     const code = studentIdInput.value.trim();
 
-    if (!code || busy.value || loadFailure.value || !company.value) {
+    if (
+        !code ||
+        busy.value ||
+        loadFailure.value ||
+        !company.value ||
+        offlineKioskOverlay.value ||
+        isBrowserOffline()
+    ) {
         return;
     }
 
     busy.value = true;
     inputRef.value?.blur?.();
+
+    if (isBrowserOffline()) {
+        showOfflineKioskError();
+        busy.value = false;
+        return;
+    }
 
     try {
         const res = await punch(companyUuid.value, code);
@@ -246,18 +388,29 @@ async function submitPunch() {
         handlePunchError(err);
     } finally {
         busy.value = false;
-        if (isIdMode.value) {
+        if (isIdMode.value && !successCheckVisible.value && !errorOverlayVisible.value) {
             await focusInput();
         }
     }
 }
 
 async function submitCardPunch(uid) {
-    if (!uid || !canAcceptTap.value) {
+    if (
+        !uid ||
+        !canAcceptTap.value ||
+        offlineKioskOverlay.value ||
+        isBrowserOffline()
+    ) {
         return;
     }
 
     busy.value = true;
+
+    if (isBrowserOffline()) {
+        showOfflineKioskError();
+        busy.value = false;
+        return;
+    }
 
     try {
         const res = await punchByCard(companyUuid.value, uid);
@@ -340,7 +493,7 @@ function maybePreviewKioskState() {
         return;
     }
     const preview = String(route.query.preview ?? '').toLowerCase();
-    if (!preview || loadFailure.value || !company.value) {
+    if (!preview || !company.value) {
         return;
     }
 
@@ -356,13 +509,58 @@ function maybePreviewKioskState() {
         return;
     }
 
+    if (preview === 'offline' || preview === 'offline_error') {
+        offlineKioskOverlay.value = true;
+        errorScene.value = 'offline';
+        clearErrorCopy();
+        errorMessage.value = OFFLINE_LINE_ONE;
+        errorSubline.value = OFFLINE_LINE_TWO;
+        errorPillText.value = OFFLINE_PILL;
+        errorFlashKey.value += 1;
+        return;
+    }
+
     const errorCode =
         preview === 'error' || preview === 'err'
             ? 'card_not_registered'
             : preview;
 
     if (STATUS_MESSAGES[errorCode] && !SUCCESS_CODES.has(errorCode)) {
-        showStatus(errorCode, '', PREVIEW_MS);
+        const previewName =
+            errorCode === 'attendance_complete' ||
+            errorCode === 'wait_before_checkout'
+                ? name
+                : '';
+        showStatus(errorCode, previewName, PREVIEW_MS);
+    }
+}
+
+function scheduleRetryLoadWhenOnline() {
+    if (loadFailure.value !== 'offline') {
+        return;
+    }
+    if (typeof window === 'undefined') {
+        return;
+    }
+    if (isBrowserOffline()) {
+        return;
+    }
+    loadCompany();
+}
+
+function onWindowOnline() {
+    offlineKioskOverlay.value = false;
+    clearErrorCopy();
+    scheduleRetryLoadWhenOnline();
+}
+
+function onWindowOffline() {
+    if (!loading.value && !company.value) {
+        loadFailure.value = 'offline';
+        return;
+    }
+    if (company.value) {
+        showOfflineKioskError();
     }
 }
 
@@ -370,11 +568,19 @@ onBeforeMount(async () => {
     clockTimer = setInterval(() => {
         now.value = dayjs();
     }, 30_000);
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', onWindowOnline);
+        window.addEventListener('offline', onWindowOffline);
+    }
     await loadCompany();
     maybePreviewKioskState();
 });
 
 onBeforeUnmount(() => {
+    if (typeof window !== 'undefined') {
+        window.removeEventListener('online', onWindowOnline);
+        window.removeEventListener('offline', onWindowOffline);
+    }
     if (typeof unsubscribeCard === 'function') {
         unsubscribeCard();
     }
@@ -398,6 +604,35 @@ onBeforeUnmount(() => {
             :mode="successMode"
             :flash-key="successFlashKey"
         />
+        <KioskErrorScreen
+            v-if="errorOverlayVisible"
+            :scene="errorScene"
+            :message="errorMessage"
+            :subline="errorSubline"
+            :headline="errorHeadline"
+            :pill-text="errorPillText"
+            :celebration-theme-index="celebrationThemeIndex"
+            :celebration-animal-index="celebrationAnimalIndex"
+            :flash-key="errorFlashKey"
+        />
+        <KioskErrorScreen
+            v-if="offlineKioskOverlay && company && !loadFailure"
+            scene="offline"
+            :message="OFFLINE_LINE_ONE"
+            :subline="OFFLINE_LINE_TWO"
+            :pill-text="OFFLINE_PILL"
+            :flash-key="0"
+        />
+        <KioskErrorScreen
+            v-if="!loading && loadFailure"
+            :scene="loadFailureScene"
+            :message="
+                loadFailureScene === 'offline' ? OFFLINE_LINE_ONE : loadFailureMessage
+            "
+            :subline="loadFailureScene === 'offline' ? OFFLINE_LINE_TWO : ''"
+            :pill-text="loadFailurePillText"
+            :flash-key="0"
+        />
     </Teleport>
     <div class="kiosk-page">
         <div
@@ -419,19 +654,7 @@ onBeforeUnmount(() => {
         <div v-if="loading" class="kiosk-page__loader kiosk-page__message--centered">
             <Loader compact />
         </div>
-        <div
-            v-else-if="loadFailure === 'not_found'"
-            class="kiosk-page__message kiosk-page__message--centered"
-        >
-            This page is not available.
-        </div>
-        <div
-            v-else-if="loadFailure === 'error'"
-            class="kiosk-page__message kiosk-page__message--centered"
-        >
-            Something went wrong.
-        </div>
-        <template v-else-if="company">
+        <template v-else-if="!loadFailure && company">
             <div class="kiosk-page__above">
                 <img
                     v-if="company?.logo"
@@ -482,47 +705,13 @@ onBeforeUnmount(() => {
                 <button type="submit" class="kiosk-page__submit" tabindex="-1">
                     Go
                 </button>
-                <div class="kiosk-page__message-slot" aria-live="polite">
-                    <p
-                        class="kiosk-page__status"
-                        :class="[
-                            `kiosk-page__status--${statusTone}`,
-                            {
-                                'kiosk-page__status--visible':
-                                    statusVisible && !successCheckVisible
-                            }
-                        ]"
-                    >
-                        {{ statusMessage }}
-                    </p>
-                </div>
             </form>
             <div v-else class="kiosk-page__center">
-                <div class="kiosk-page__message-slot" aria-live="polite">
-                    <p v-show="showIdleHint" class="kiosk-page__hint">
-                        Tap your card on the reader.
-                    </p>
-                    <p
-                        class="kiosk-page__status"
-                        :class="[
-                            `kiosk-page__status--${statusTone}`,
-                            {
-                                'kiosk-page__status--visible':
-                                    statusVisible && !successCheckVisible
-                            }
-                        ]"
-                    >
-                        {{ statusMessage }}
-                    </p>
-                </div>
+                <p v-show="showIdleHint" class="kiosk-page__hint">
+                    Tap your card on the reader.
+                </p>
             </div>
         </template>
-        <div
-            v-else
-            class="kiosk-page__message kiosk-page__message--centered"
-        >
-            Something went wrong.
-        </div>
     </div>
 </template>
 

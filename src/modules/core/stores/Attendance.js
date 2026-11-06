@@ -34,20 +34,16 @@ export const useAttendanceStore = defineStore('AttendanceStore', () => {
         });
     };
 
-    const deleteItem = (id) => {
+    const studentOptions = (params) => {
         return globalStore.actionWrapper(async () => {
-            const res = await AttendanceService.deleteItem(id);
-            globalStore.showSuccess(
-                'Attendance deleted',
-                'Attendance record deleted successfully'
-            );
+            const res = await AttendanceService.studentOptions(params);
             return res.data;
         });
     };
 
-    const studentOptions = (params) => {
+    const summary = (payload) => {
         return globalStore.actionWrapper(async () => {
-            const res = await AttendanceService.studentOptions(params);
+            const res = await AttendanceService.summary(payload);
             return res.data;
         });
     };
@@ -56,7 +52,7 @@ export const useAttendanceStore = defineStore('AttendanceStore', () => {
         search,
         create,
         update,
-        deleteItem,
-        studentOptions
+        studentOptions,
+        summary
     };
 });

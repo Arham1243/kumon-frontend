@@ -23,6 +23,7 @@ const props = defineProps({
     scrollHeight: { type: String, default: '600px' },
     scrollable: { type: Boolean, default: true },
     resizableColumns: { type: Boolean, default: true },
+    columnResizeMode: { type: String, default: 'expand' },
     columnFilters: { type: Boolean, default: false },
     filters: { type: Object, default: undefined }
 });
@@ -69,7 +70,7 @@ const onFiltersUpdate = (value) => {
     <DataTable
         v-bind="$attrs"
         :resizableColumns="resizableColumns"
-        columnResizeMode="expand"
+        :columnResizeMode="columnResizeMode"
         :lazy="lazy"
         :value="value"
         :data-key="dataKey"

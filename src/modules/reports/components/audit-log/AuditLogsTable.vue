@@ -10,7 +10,11 @@ import TitleHeader from '@/components/common/TitleHeader.vue';
 import DateRangePresetPicker from '@/components/common/DateRangePresetPicker.vue';
 import TableColumnFilter from '@/components/common/table-filters/TableColumnFilter.vue';
 import { useActivityLogStore } from '@/modules/reports/stores';
-import { DIALOG_CLASS, PaginationOptions, SortFilterOptions } from '@/config';
+import {
+    DIALOG_CLASS_EXTRA_WIDE,
+    PaginationOptions,
+    SortFilterOptions
+} from '@/config';
 import { useHelpers, useTableColumnFilters } from '@/composables';
 import { TEXT_COLUMN_FILTER, enumToSelectFilter } from '@/utils/tableFilters';
 import { isCompleteDateRange } from '@/utils/dateRangePresets';
@@ -54,6 +58,11 @@ const columnsMenuItems = [
         filter: AUDIT_LOG_RESOURCE_FILTER
     },
     {
+        field: 'subject_label',
+        header: 'Resource Name',
+        sortable: false
+    },
+    {
         field: 'event',
         header: 'Event',
         sortable: true,
@@ -83,7 +92,7 @@ const { primeFilters, onColumnFilter } = useTableColumnFilters({
     }
 });
 
-const propertyChanges = computed(() => {
+const propertyChangeRows = computed(() => {
     const props = selectedRow.value?.properties;
     if (!props || typeof props !== 'object') {
         return [];
@@ -91,11 +100,13 @@ const propertyChanges = computed(() => {
     const attrs = props.attributes || {};
     const old = props.old || {};
     const keys = new Set([...Object.keys(attrs), ...Object.keys(old)]);
-    return [...keys].map((key) => ({
-        field: key,
-        old: formatChangeValue(old[key]),
-        new: formatChangeValue(attrs[key])
-    }));
+    return [...keys]
+        .filter((key) => key !== 'subject_label')
+        .map((key) => ({
+            field: key,
+            old: formatChangeValue(old[key]),
+            new: formatChangeValue(attrs[key])
+        }));
 });
 
 function formatChangeValue(value) {
@@ -304,6 +315,12 @@ onBeforeMount(async () => {
                         {{ formatDateTime(data.created_at) }}
                     </template>
                     <template
+                        v-else-if="col.field === 'subject_label'"
+                        #body="{ data }"
+                    >
+                        {{ data.subject_label || '-' }}
+                    </template>
+                    <template
                         v-else-if="col.field === 'event'"
                         #body="{ data }"
                     >
@@ -362,45 +379,128 @@ onBeforeMount(async () => {
         v-model:visible="propertiesDialogVisible"
         modal
         header="Property changes"
-        :class="DIALOG_CLASS"
+        :class="DIALOG_CLASS_EXTRA_WIDE"
         :draggable="false"
     >
-        <p
-            v-if="selectedRow"
-            class="text-sm text-surface-600 mb-3 flex flex-wrap items-center gap-2"
+        <div
+            v-if="selectedRow || propertyChangeRows.length"
+            class="grid items-start gap-4"
+            :class="
+                selectedRow && propertyChangeRows.length
+                    ? 'grid-cols-[minmax(0,3fr)_minmax(0,7fr)]'
+                    : 'grid-cols-1'
+            "
         >
-            <span>{{ selectedRow.log_name }}</span>
-            <Tag
-                class="!text-xs"
-                :value="formatEventName(selectedRow.event)"
-                :severity="eventSeverity(selectedRow.event)"
-            />
-            <span>{{ formatDateTime(selectedRow.created_at) }}</span>
-        </p>
-        <div v-if="propertyChanges.length" class="overflow-x-auto">
-            <table class="w-full text-sm border-collapse">
-                <thead>
-                    <tr class="border-b border-surface-200">
-                        <th class="text-left py-2 pr-3 font-medium">Field</th>
-                        <th class="text-left py-2 pr-3 font-medium">
-                            Previous
-                        </th>
-                        <th class="text-left py-2 font-medium">New</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr
-                        v-for="row in propertyChanges"
-                        :key="row.field"
-                        class="border-b border-surface-100 align-top"
+            <div
+                v-if="selectedRow"
+                class="audit-log-resource-details panel-surface"
+            >
+                <div class="audit-log-resource-details__rows space-y-2 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <span
+                            class="audit-log-resource-details__label shrink-0"
+                            >Resource</span
+                        >
+                        <span
+                            class="audit-log-resource-details__value text-right break-all min-w-0 font-semibold"
+                            >{{ selectedRow.log_name || '-' }}</span
+                        >
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span
+                            class="audit-log-resource-details__label shrink-0"
+                            >Resource name</span
+                        >
+                        <span
+                            class="audit-log-resource-details__value text-right break-all min-w-0 font-semibold"
+                            >{{ selectedRow.subject_label || '-' }}</span
+                        >
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <span
+                            class="audit-log-resource-details__label shrink-0"
+                            >Date</span
+                        >
+                        <span
+                            class="audit-log-resource-details__value text-right break-all min-w-0 font-semibold"
+                            >{{ formatDateTime(selectedRow.created_at) }}</span
+                        >
+                    </div>
+                    <div class="flex justify-between items-center gap-4">
+                        <span
+                            class="audit-log-resource-details__label shrink-0"
+                            >Event</span
+                        >
+                        <Tag
+                            class="!text-xs"
+                            :value="formatEventName(selectedRow.event)"
+                            :severity="eventSeverity(selectedRow.event)"
+                        />
+                    </div>
+                    <div
+                        v-if="selectedRow.subject_uuid"
+                        class="flex justify-between gap-4"
                     >
-                        <td class="py-2 pr-3 font-medium">{{ row.field }}</td>
-                        <td class="py-2 pr-3 break-all">{{ row.old }}</td>
-                        <td class="py-2 break-all">{{ row.new }}</td>
-                    </tr>
-                </tbody>
-            </table>
+                        <span
+                            class="audit-log-resource-details__label shrink-0"
+                            >UUID</span
+                        >
+                        <span
+                            class="audit-log-resource-details__value text-right break-all min-w-0 font-semibold font-mono text-xs"
+                            >{{ selectedRow.subject_uuid }}</span
+                        >
+                    </div>
+                </div>
+            </div>
+            <div
+                v-if="propertyChangeRows.length"
+                class="min-w-0 overflow-x-auto"
+            >
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-surface-200">
+                            <th class="text-left py-2 pr-3 font-medium">
+                                Field
+                            </th>
+                            <th class="text-left py-2 pr-3 font-medium">
+                                Previous
+                            </th>
+                            <th class="text-left py-2 font-medium">New</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="row in propertyChangeRows"
+                            :key="row.field"
+                            class="border-b border-surface-100 align-top"
+                        >
+                            <td class="py-2 pr-3 font-medium">
+                                {{ row.field }}
+                            </td>
+                            <td class="py-2 pr-3 break-all">{{ row.old }}</td>
+                            <td class="py-2 break-all">{{ row.new }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-        <p v-else class="text-surface-500">No property details recorded.</p>
+        <p
+            v-if="selectedRow && !propertyChangeRows.length"
+            class="text-surface-500 text-sm mt-3"
+        >
+            No additional field changes in this entry.
+        </p>
     </Dialog>
 </template>
+
+<style scoped>
+.audit-log-resource-details__label {
+    font-size: 0.875rem;
+    color: var(--p-text-muted-color, rgb(100 116 139));
+}
+
+.audit-log-resource-details__value {
+    color: var(--p-text-color);
+}
+</style>
+

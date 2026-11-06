@@ -14,6 +14,7 @@ const props = defineProps({
     enableDirtyCheck: { type: Boolean, default: true },
     initialData: { type: Object, default: null },
     hideFooter: { type: Boolean, default: false },
+    hideCancelButton: { type: Boolean, default: false },
     disableConfirm: { type: Boolean, default: false },
     /** PrimeVue Button severity for the confirm action (e.g. `success`). */
     confirmSeverity: { type: String, default: undefined },
@@ -128,6 +129,7 @@ defineExpose({
         <template #footer v-if="!props.hideFooter">
             <slot name="footer">
                 <Button
+                    v-if="!props.hideCancelButton"
                     text
                     variant="outlined"
                     :label="cancelLabel"

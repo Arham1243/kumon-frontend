@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import {
+    buildCelebrationFrontSvg,
     buildCelebrationGreeting,
     buildCelebrationGroundSvg,
-    buildCelebrationSvg,
+    buildCelebrationHeroSvg,
+    buildCelebrationSkySvg,
     celebrationAriaLabel,
     greetingFontSizeStyle,
     KIOSK_THEMES,
@@ -47,8 +49,16 @@ watch(
     { immediate: true }
 );
 
-const svgHtml = computed(() =>
-    buildCelebrationSvg(themeIndex.value, animalIndex.value, {
+const skySvgHtml = computed(() =>
+    buildCelebrationSkySvg(themeIndex.value, {
+        reducedMotion: reducedMotion.value
+    })
+);
+
+const frontSvgHtml = computed(() => buildCelebrationFrontSvg(themeIndex.value));
+
+const heroSvgHtml = computed(() =>
+    buildCelebrationHeroSvg(themeIndex.value, animalIndex.value, {
         reducedMotion: reducedMotion.value
     })
 );
@@ -90,12 +100,14 @@ const ariaLabel = computed(() =>
         :aria-label="ariaLabel"
         :style="shellStyle"
     >
-        <div class="kiosk-celebration__svg" v-html="svgHtml" />
+        <div class="kiosk-celebration__sky" v-html="skySvgHtml" />
         <div
             class="kiosk-celebration__ground"
             v-html="groundSvgHtml"
             aria-hidden="true"
         />
+        <div class="kiosk-celebration__front" v-html="frontSvgHtml" />
+        <div class="kiosk-celebration__character" v-html="heroSvgHtml" />
         <p class="kiosk-celebration__greeting" :style="greetingStyle">
             {{ greeting }}
         </p>
@@ -120,7 +132,7 @@ const ariaLabel = computed(() =>
     left: 0;
     right: 0;
     height: 14%;
-    z-index: 2;
+    z-index: 3;
     display: flex;
     align-items: flex-start;
     justify-content: center;
@@ -135,12 +147,28 @@ const ariaLabel = computed(() =>
     pointer-events: none;
 }
 
-.kiosk-celebration__svg {
+.kiosk-celebration__sky,
+.kiosk-celebration__front,
+.kiosk-celebration__character {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
 }
 
-.kiosk-celebration__svg :deep(svg) {
+.kiosk-celebration__sky {
+    z-index: 0;
+}
+
+.kiosk-celebration__front,
+.kiosk-celebration__character {
+    z-index: 2;
+}
+
+.kiosk-celebration__sky :deep(svg),
+.kiosk-celebration__front :deep(svg),
+.kiosk-celebration__character :deep(svg) {
     display: block;
     width: 100%;
     height: 100%;
@@ -153,7 +181,7 @@ const ariaLabel = computed(() =>
     bottom: 0;
     z-index: 1;
     width: 100%;
-    height: clamp(7.5rem, 22vh, 12rem);
+    height: clamp(10rem, 28vh, 15rem);
     pointer-events: none;
 }
 

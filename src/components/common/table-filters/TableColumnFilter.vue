@@ -37,6 +37,7 @@ const onUpdate = (value) => {
         :modelValue="modelValue"
         :options="config.options"
         :placeholder="config.placeholder"
+        :label-class="config.labelClass"
         @update:modelValue="onUpdate"
         @apply="onApply"
     />

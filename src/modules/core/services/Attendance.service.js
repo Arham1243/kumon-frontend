@@ -16,10 +16,6 @@ export const update = (id, payload) => {
     return AxiosService.put(`${BASE_URL}/attendances/${id}`, payload);
 };
 
-export const deleteItem = (id) => {
-    return AxiosService.delete(`${BASE_URL}/attendances/${id}/delete`);
-};
-
 export const studentOptions = (params) => {
     return AxiosService.get(`${BASE_URL}/attendances/student-options`, {
         params
@@ -30,4 +26,8 @@ export const exportFile = (payload) => {
     return AxiosService.post(`${BASE_URL}/attendances/export`, payload, {
         responseType: 'blob'
     });
+};
+
+export const summary = (payload) => {
+    return AxiosService.post(`${BASE_URL}/attendances/summary`, payload);
 };

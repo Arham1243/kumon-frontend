@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeMount, ref, watch } from 'vue';
+import { computed, onBeforeMount, ref } from 'vue';
 import { useAttendanceStore } from '@/modules/core/stores';
 import { useGlobalStore, useSessionStore } from '@/stores';
 import { PaginationOptions, SortFilterOptions } from '@/config';
@@ -8,13 +8,17 @@ import TableColumnFilter from '@/components/common/table-filters/TableColumnFilt
 import { TEXT_COLUMN_FILTER } from '@/utils/tableFilters';
 import InputField from '@/components/common/InputField.vue';
 import BaseDialog from '@/components/common/BaseDialog.vue';
-import Confirmation from '@/components/common/Confirmation.vue';
 import DateRangePresetPicker from '@/components/common/DateRangePresetPicker.vue';
 import ExportFormatMenu from '@/components/common/ExportFormatMenu.vue';
 import { AttendanceService } from '@/modules/core/services';
 import { downloadTabularExport } from '@/utils/downloadBlob';
-import { isCompleteDateRange } from '@/utils/dateRangePresets';
+import {
+    isCompleteDateRange,
+    normalizeDateRange,
+    rangeForPreset
+} from '@/utils/dateRangePresets';
 import dayjs from '@/plugins/dayjs';
+import Checkbox from 'primevue/checkbox';
 
 const EXPORT_COLUMNS = [
     'student.name',
@@ -25,6 +29,44 @@ const EXPORT_COLUMNS = [
 ];
 
 const helpers = useHelpers();
+
+/**
+ * Match Students status filters: compact circular count badges.
+ */
+const ATT_COUNT_BADGE_BASE =
+    'inline-flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border text-center text-[9px] font-bold tabular-nums leading-none shadow-sm';
+const STATUS_COUNT_BADGE_ACTIVE_CHECKED_IN = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-emerald-900 dark:border-emerald-200/30 dark:bg-emerald-950 dark:text-emerald-50`;
+const STATUS_COUNT_BADGE_INACTIVE_CHECKED_IN = `${ATT_COUNT_BADGE_BASE} border-emerald-600/25 bg-emerald-600/25 text-emerald-950 dark:border-emerald-400/35 dark:bg-emerald-400/20 dark:text-emerald-50`;
+const STATUS_COUNT_BADGE_ACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-sky-950 dark:border-sky-200/30 dark:bg-sky-950 dark:text-sky-50`;
+const STATUS_COUNT_BADGE_INACTIVE_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-sky-600/25 bg-sky-600/25 text-sky-950 dark:border-sky-400/35 dark:bg-sky-400/20 dark:text-sky-50`;
+const STATUS_COUNT_BADGE_ACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-white/80 bg-white text-violet-950 dark:border-violet-200/30 dark:bg-violet-950 dark:text-violet-50`;
+const STATUS_COUNT_BADGE_INACTIVE_NOT_CHECKED_OUT = `${ATT_COUNT_BADGE_BASE} border-violet-600/25 bg-violet-600/25 text-violet-950 dark:border-violet-400/35 dark:bg-violet-400/20 dark:text-violet-50`;
+
+/** Same checkbox treatment as Students: white box + preset check when selected */
+const FILTER_CB_WRAP_CHECKED_IN =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-emerald-300 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-emerald-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-emerald-600 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-emerald-950/30 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-emerald-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-emerald-800 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-emerald-500';
+const FILTER_CB_WRAP_CHECKED_OUT =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-sky-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-sky-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-sky-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-sky-950/40 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-sky-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-sky-800 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-sky-500';
+const FILTER_CB_WRAP_NOT_CHECKED_OUT =
+    '[&_.p-checkbox]:!inline-flex [&_.p-checkbox]:!items-center ' +
+    '[&_.p-checkbox-box]:!border-2 [&_.p-checkbox-box]:shadow-none ' +
+    '[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-violet-400 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-violet-50 ' +
+    'dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!border-violet-500 dark:[&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-box]:!bg-violet-950/40 ' +
+    '[&_.p-checkbox-checked_.p-checkbox-box]:!border-white [&_.p-checkbox-checked_.p-checkbox-box]:!bg-white ' +
+    '[&_.p-checkbox-checked_.p-checkbox-icon]:!text-violet-600 [&_.p-checkbox:not(.p-checkbox-checked)_.p-checkbox-icon]:!text-violet-800 ' +
+    'dark:[&_.p-checkbox-checked_.p-checkbox-icon]:!text-violet-500';
 
 function disableFutureAttendanceDate(date) {
     return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
@@ -63,7 +105,6 @@ function openStudentIdKiosk() {
 
 const pagination = new PaginationOptions();
 const sortFilters = new SortFilterOptions();
-const menu = ref();
 const selectedItem = ref(null);
 const loading = ref(false);
 const items = ref([]);
@@ -71,19 +112,27 @@ const isEditMode = ref(false);
 const busy = ref(false);
 const totalRecords = ref();
 const showDialog = ref(false);
-const deleteDialog = ref(false);
 const loadingStudents = ref(false);
 const students = ref([]);
-const selectedStudentId = ref(null);
-const periodPreset = ref('all');
-const dateRangeForRun = ref([null, null]);
-const appliedDateRange = ref([]);
+
+const todayRange = normalizeDateRange(rangeForPreset('today'));
+const periodPreset = ref('today');
+const dateRangeForRun = ref(todayRange ? [...todayRange] : [null, null]);
+const appliedDateRange = ref(
+    todayRange ? [...todayRange] : []
+);
+
+const statusFilter = ref(null);
+const loadingSummary = ref(false);
+const checkInCount = ref(0);
+const checkOutCount = ref(0);
+const notCheckedOutCount = ref(0);
 
 const formData = ref({
     student_id: null,
     date: null,
-    check_in_time: '',
-    check_out_time: ''
+    check_in_time: null,
+    check_out_time: null
 });
 
 const filterColumnConfigs = [
@@ -94,7 +143,7 @@ const filterColumnConfigs = [
     { field: 'check_out_time', filter: TEXT_COLUMN_FILTER }
 ];
 
-function makeCustomFiltersPayload() {
+function makeDateCustomFilters() {
     const customFilters = [];
     if (isCompleteDateRange(appliedDateRange.value)) {
         customFilters.push({
@@ -104,6 +153,24 @@ function makeCustomFiltersPayload() {
         });
     }
     return customFilters;
+}
+
+function makeCustomFiltersPayload() {
+    const customFilters = [...makeDateCustomFilters()];
+    if (statusFilter.value) {
+        customFilters.push({
+            field: 'attendance_status',
+            operator: '=',
+            value: statusFilter.value
+        });
+    }
+    return customFilters;
+}
+
+function buildSummaryPayload() {
+    return {
+        customFilters: makeDateCustomFilters()
+    };
 }
 
 function buildSearchPayload() {
@@ -117,7 +184,7 @@ function buildSearchPayload() {
     };
 }
 
-async function getItems() {
+async function fetchTable() {
     try {
         loading.value = true;
         const params = { ...pagination.getPageParams() };
@@ -129,12 +196,33 @@ async function getItems() {
     }
 }
 
+async function refreshSummary() {
+    try {
+        loadingSummary.value = true;
+        const res = await AttendanceService.summary(buildSummaryPayload());
+        const d = res.data?.data ?? res.data;
+        if (d) {
+            checkInCount.value = d.check_in_count ?? 0;
+            checkOutCount.value = d.check_out_count ?? 0;
+            notCheckedOutCount.value = d.not_checked_out_count ?? 0;
+        }
+    } catch (error) {
+        console.error(error);
+    } finally {
+        loadingSummary.value = false;
+    }
+}
+
+async function getItems() {
+    await fetchTable();
+    await refreshSummary();
+}
+
 const { primeFilters, onColumnFilter } = useTableColumnFilters({
     columnConfigs: filterColumnConfigs,
     sortFilters,
     pagination,
-    refetch: getItems,
-    preserveFilters: ['student_id'],
+    refetch: fetchTable,
     fieldAliases: {
         student_name: 'student.name',
         student_student_id: 'student.student_id'
@@ -149,13 +237,52 @@ async function applyDateFilter() {
     await getItems();
 }
 
+function toggleCheckedInFilter() {
+    if (statusFilter.value === 'checked_in') {
+        statusFilter.value = null;
+    } else {
+        statusFilter.value = 'checked_in';
+    }
+    pagination.resetPageParams();
+    getItems();
+}
+
+function toggleCheckedOutFilter() {
+    if (statusFilter.value === 'checked_out') {
+        statusFilter.value = null;
+    } else {
+        statusFilter.value = 'checked_out';
+    }
+    pagination.resetPageParams();
+    getItems();
+}
+
+function toggleNotCheckedOutFilter() {
+    if (statusFilter.value === 'not_checked_out') {
+        statusFilter.value = null;
+    } else {
+        statusFilter.value = 'not_checked_out';
+    }
+    pagination.resetPageParams();
+    getItems();
+}
+
 async function exportFilteredReport(format) {
     try {
         loading.value = true;
+        const exportPayload = buildSearchPayload();
+        const statusIdx = exportPayload.customFilters.findIndex(
+            (f) => f.field === 'attendance_status'
+        );
+        if (statusIdx !== -1) {
+            exportPayload.customFilters = exportPayload.customFilters.filter(
+                (f) => f.field !== 'attendance_status'
+            );
+        }
         const res = await AttendanceService.exportFile({
             format,
             columns: EXPORT_COLUMNS,
-            ...buildSearchPayload()
+            ...exportPayload
         });
         downloadTabularExport(res.data, {
             filenameBase: 'attendance',
@@ -180,35 +307,8 @@ async function loadStudents(searchText = '') {
     }
 }
 
-watch(selectedStudentId, (value) => {
-    pagination.resetPageParams();
-    sortFilters.updateFilters('student_id', value, '=');
-    getItems();
-});
-
 onBeforeMount(async () => {
     await Promise.all([getItems(), loadStudents()]);
-});
-
-const menuItems = computed(() => {
-    if (!selectedItem.value) return [];
-
-    const allMenuItems = [
-        {
-            label: 'Edit',
-            icon: 'pi pi-pencil',
-            command: () => editItem(),
-            permission: 'core.attendance.edit'
-        },
-        {
-            label: 'Delete',
-            icon: 'pi pi-trash',
-            command: () => showDeleteDialog(),
-            permission: 'core.attendance.delete'
-        }
-    ];
-
-    return helpers.filterByPermission(allMenuItems);
 });
 
 function formatTime(value) {
@@ -224,9 +324,6 @@ const openDialog = (mode = 'add') => {
     isEditMode.value = mode === 'edit';
     if (mode === 'add') {
         resetForm();
-        if (selectedStudentId.value) {
-            formData.value.student_id = selectedStudentId.value;
-        }
     }
     showDialog.value = true;
 };
@@ -240,39 +337,31 @@ const resetForm = () => {
     formData.value = {
         student_id: null,
         date: null,
-        check_in_time: '',
-        check_out_time: ''
+        check_in_time: null,
+        check_out_time: null
     };
     globalStore.clearErrors();
 };
 
-const editItem = () => {
-    resetForm();
-    formData.value.student_id = selectedItem.value.student_id;
-    formData.value.date = selectedItem.value.date;
-    formData.value.check_in_time = selectedItem.value.check_in_time ?? '';
-    formData.value.check_out_time = selectedItem.value.check_out_time ?? '';
-    openDialog('edit');
-};
-
-const showDeleteDialog = () => {
-    deleteDialog.value = true;
-};
-
-const showActions = (event, item) => {
+const editItem = (item) => {
     selectedItem.value = item;
-    menu.value.toggle(event);
+    resetForm();
+    formData.value.student_id = item.student_id;
+    formData.value.date = item.date;
+    formData.value.check_in_time = item.check_in_time || null;
+    formData.value.check_out_time = item.check_out_time || null;
+    openDialog('edit');
 };
 
 const onSortChange = (event) => {
     pagination.resetPageParams();
     sortFilters.updateSortFilters(event);
-    getItems();
+    fetchTable();
 };
 
 const onPageChange = (event) => {
     pagination.updatePageParams(event);
-    getItems();
+    fetchTable();
 };
 
 const save = async () => {
@@ -295,19 +384,6 @@ const save = async () => {
         busy.value = false;
     }
 };
-
-const deleteItem = async () => {
-    try {
-        loading.value = true;
-        if (selectedItem.value) {
-            await attendanceStore.deleteItem(selectedItem.value.uuid);
-        }
-        await getItems();
-        selectedItem.value = null;
-    } finally {
-        loading.value = false;
-    }
-};
 </script>
 
 <template>
@@ -321,29 +397,6 @@ const deleteItem = async () => {
         <div
             class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0 justify-end items-stretch sm:items-end"
         >
-            <div class="flex flex-col shrink-0 w-full sm:w-64 md:w-80">
-                <label
-                    class="block text-sm mb-1 text-surface-700 dark:text-surface-200"
-                    for="attendance_student_filter"
-                >
-                    Filter by Student
-                </label>
-                <ApiDropdown
-                    filter
-                    showClear
-                    :autoFetchOnMount="false"
-                    placeholder="Select"
-                    :loading="loadingStudents"
-                    @search="(s) => loadStudents(s)"
-                    :options="students"
-                    optionLabel="name"
-                    optionValue="id"
-                    id="attendance_student_filter"
-                    class="w-full"
-                    v-model="selectedStudentId"
-                    :disabled="loadingStudents"
-                />
-            </div>
             <Button
                 v-if="kioskUrl"
                 label="Student Attendance (Scan)"
@@ -386,12 +439,193 @@ const deleteItem = async () => {
                 @page="onPageChange"
             >
                 <template #header>
-                    <div class="flex justify-end mb-2">
+                    <div
+                        class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between mb-2"
+                    >
+                        <div
+                            class="flex flex-wrap items-center gap-2 min-h-[2.5rem]"
+                        >
+                            <Button
+                                type="button"
+                                :severity="
+                                    statusFilter === 'checked_in'
+                                        ? 'success'
+                                        : undefined
+                                "
+                                :variant="
+                                    statusFilter === 'checked_in'
+                                        ? undefined
+                                        : 'outlined'
+                                "
+                                :class="[
+                                    '!items-center',
+                                    statusFilter === 'checked_in'
+                                        ? undefined
+                                        : '!bg-emerald-50 !border-emerald-300 !text-emerald-900 hover:!bg-emerald-100 dark:!bg-emerald-950/30 dark:!border-emerald-600 dark:!text-emerald-50'
+                                ]"
+                                :disabled="loading"
+                                :aria-pressed="statusFilter === 'checked_in'"
+                                aria-label="Filter by checked in attendance"
+                                @click="toggleCheckedInFilter"
+                            >
+                                <span
+                                    class="inline-flex items-center justify-center gap-2 leading-none"
+                                >
+                                    <span
+                                        class="pointer-events-none inline-flex shrink-0 items-center self-center"
+                                        :class="FILTER_CB_WRAP_CHECKED_IN"
+                                        aria-hidden="true"
+                                    >
+                                        <Checkbox
+                                            :model-value="
+                                                statusFilter === 'checked_in'
+                                            "
+                                            binary
+                                            readonly
+                                            :disabled="loading"
+                                            :tabindex="-1"
+                                        />
+                                    </span>
+                                    <span class="self-center leading-none">Checked in</span>
+                                    <span
+                                        class="self-center"
+                                        :class="
+                                            statusFilter === 'checked_in'
+                                                ? STATUS_COUNT_BADGE_ACTIVE_CHECKED_IN
+                                                : STATUS_COUNT_BADGE_INACTIVE_CHECKED_IN
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        {{ checkInCount }}
+                                    </span>
+                                </span>
+                            </Button>
+                            <Button
+                                type="button"
+                                :severity="
+                                    statusFilter === 'checked_out'
+                                        ? 'info'
+                                        : undefined
+                                "
+                                :variant="
+                                    statusFilter === 'checked_out'
+                                        ? undefined
+                                        : 'outlined'
+                                "
+                                :class="[
+                                    '!items-center',
+                                    statusFilter === 'checked_out'
+                                        ? undefined
+                                        : '!bg-sky-50 !border-sky-400 !text-sky-950 hover:!bg-sky-100 dark:!bg-sky-950/40 dark:!border-sky-500 dark:!text-sky-50'
+                                ]"
+                                :disabled="loading"
+                                :aria-pressed="statusFilter === 'checked_out'"
+                                aria-label="Filter by checked out attendance"
+                                @click="toggleCheckedOutFilter"
+                            >
+                                <span
+                                    class="inline-flex items-center justify-center gap-2 leading-none"
+                                >
+                                    <span
+                                        class="pointer-events-none inline-flex shrink-0 items-center self-center"
+                                        :class="FILTER_CB_WRAP_CHECKED_OUT"
+                                        aria-hidden="true"
+                                    >
+                                        <Checkbox
+                                            :model-value="
+                                                statusFilter === 'checked_out'
+                                            "
+                                            binary
+                                            readonly
+                                            :disabled="loading"
+                                            :tabindex="-1"
+                                        />
+                                    </span>
+                                    <span class="self-center leading-none">Checked out</span>
+                                    <span
+                                        class="self-center"
+                                        :class="
+                                            statusFilter === 'checked_out'
+                                                ? STATUS_COUNT_BADGE_ACTIVE_CHECKED_OUT
+                                                : STATUS_COUNT_BADGE_INACTIVE_CHECKED_OUT
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        {{ checkOutCount }}
+                                    </span>
+                                </span>
+                            </Button>
+                            <Button
+                                type="button"
+                                :severity="
+                                    statusFilter === 'not_checked_out'
+                                        ? 'help'
+                                        : undefined
+                                "
+                                :variant="
+                                    statusFilter === 'not_checked_out'
+                                        ? undefined
+                                        : 'outlined'
+                                "
+                                :class="[
+                                    '!items-center',
+                                    statusFilter === 'not_checked_out'
+                                        ? undefined
+                                        : '!bg-violet-50 !border-violet-300 !text-violet-950 hover:!bg-violet-100 dark:!bg-violet-950/40 dark:!border-violet-500 dark:!text-violet-50'
+                                ]"
+                                :disabled="loading"
+                                :aria-pressed="
+                                    statusFilter === 'not_checked_out'
+                                "
+                                aria-label="Filter by not checked out or all students"
+                                @click="toggleNotCheckedOutFilter"
+                            >
+                                <span
+                                    class="inline-flex items-center justify-center gap-2 leading-none"
+                                >
+                                    <span
+                                        class="pointer-events-none inline-flex shrink-0 items-center self-center"
+                                        :class="FILTER_CB_WRAP_NOT_CHECKED_OUT"
+                                        aria-hidden="true"
+                                    >
+                                        <Checkbox
+                                            :model-value="
+                                                statusFilter ===
+                                                'not_checked_out'
+                                            "
+                                            binary
+                                            readonly
+                                            :disabled="loading"
+                                            :tabindex="-1"
+                                        />
+                                    </span>
+                                    <span class="self-center leading-none">{{
+                                        statusFilter === 'not_checked_out'
+                                            ? 'All Students'
+                                            : 'Not Checked Out'
+                                    }}</span>
+                                    <span
+                                        v-if="
+                                            statusFilter !== 'not_checked_out'
+                                        "
+                                        class="self-center"
+                                        :class="
+                                            statusFilter === 'not_checked_out'
+                                                ? STATUS_COUNT_BADGE_ACTIVE_NOT_CHECKED_OUT
+                                                : STATUS_COUNT_BADGE_INACTIVE_NOT_CHECKED_OUT
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        {{ notCheckedOutCount }}
+                                    </span>
+                                </span>
+                            </Button>
+                        </div>
                         <div class="flex flex-nowrap items-end gap-2 shrink-0">
                             <DateRangePresetPicker
                                 v-model:date-range="dateRangeForRun"
                                 v-model:preset="periodPreset"
-                                default-preset="all"
+                                default-preset="today"
                                 :disabled="loading"
                             />
                             <Button
@@ -512,29 +746,19 @@ const deleteItem = async () => {
 
                 <Column
                     columnKey="actions"
-                    v-if="
-                        $ability.can('core.attendance.edit') ||
-                        $ability.can('core.attendance.delete')
-                    "
+                    v-if="$ability.can('core.attendance.edit')"
                     header="Actions"
                     class="flex justify-end"
                 >
                     <template #body="{ data }">
                         <Button
-                            class="!px-3 !py-2"
-                            label="Actions"
-                            variant="outlined"
-                            iconPos="right"
-                            icon="pi pi-chevron-down"
-                            size="small"
-                            @click="showActions($event, data)"
-                        />
-
-                        <Menu
-                            ref="menu"
-                            id="attendance_overlay_menu"
-                            :model="menuItems"
-                            :popup="true"
+                            type="button"
+                            icon="pi pi-pencil"
+                            severity="primary"
+                            rounded
+                            aria-label="Edit attendance"
+                            :disabled="loading"
+                            @click="editItem(data)"
                         />
                     </template>
                 </Column>
@@ -623,13 +847,4 @@ const deleteItem = async () => {
             />
         </div>
     </BaseDialog>
-
-    <Confirmation
-        v-if="$ability.can('core.attendance.delete')"
-        v-model="deleteDialog"
-        variant="danger"
-        header="Delete Attendance"
-        content="Are you sure you want to delete this attendance record?"
-        @confirm="deleteItem"
-    />
 </template>
