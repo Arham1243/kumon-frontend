@@ -3,6 +3,8 @@ import RawField from './RawField.vue';
 import { computed } from 'vue';
 import { useGlobalStore } from '@/stores';
 
+defineOptions({ inheritAttrs: false });
+
 const globalStore = useGlobalStore();
 
 const props = defineProps({
@@ -105,74 +107,88 @@ const fieldWrapperClass = computed(() => ({
 </script>
 
 <template>
-    <span
-        v-if="iconBefore || iconAfter"
-        class="input-field-wrap"
-        :class="[
-            fieldWrapperClass,
-            {
-                'p-input-icon-left': iconBefore,
-                'p-input-icon-right': iconAfter
-            }
-        ]"
-    >
-        <i
-            v-if="iconBefore"
-            :class="iconBefore"
-            :data-testid="dataTestidIcon"
-            @click.stop="emit('iconBeforeClick')"
-        />
-        <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
-        <i
-            v-if="iconAfter"
-            class="cursor-pointer"
-            :data-testid="dataTestidIcon"
-            :class="iconAfter"
-            @click.stop="emit('iconAfterClick')"
-        />
-    </span>
-
-    <div
-        v-else-if="addonBefore || addonAfter"
-        class="p-inputgroup input-field-wrap"
-        :class="fieldWrapperClass"
-    >
-        <span v-if="addonBefore" class="p-inputgroup-addon">
+    <div class="input-field-root">
+        <span
+            v-if="iconBefore || iconAfter"
+            class="input-field-wrap"
+            :class="[
+                fieldWrapperClass,
+                {
+                    'p-input-icon-left': iconBefore,
+                    'p-input-icon-right': iconAfter
+                }
+            ]"
+        >
             <i
+                v-if="iconBefore"
+                :class="iconBefore"
                 :data-testid="dataTestidIcon"
-                v-if="addonBefore.includes('pi')"
-                :class="addonBefore"
-            ></i>
-            <span v-else>{{ addonBefore }}</span>
-        </span>
-        <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
-        <span v-if="addonAfter" class="p-inputgroup-addon">
+                @click.stop="emit('iconBeforeClick')"
+            />
+            <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
             <i
+                v-if="iconAfter"
+                class="cursor-pointer"
                 :data-testid="dataTestidIcon"
-                v-if="addonAfter.includes('pi')"
-                :class="addonAfter"
-            ></i>
-            <span v-else>{{ addonAfter }}</span>
+                :class="iconAfter"
+                @click.stop="emit('iconAfterClick')"
+            />
         </span>
-    </div>
 
-    <div v-else class="input-field-wrap" :class="fieldWrapperClass">
-        <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
-    </div>
+        <div
+            v-else-if="addonBefore || addonAfter"
+            class="p-inputgroup input-field-wrap"
+            :class="fieldWrapperClass"
+        >
+            <span v-if="addonBefore" class="p-inputgroup-addon">
+                <i
+                    :data-testid="dataTestidIcon"
+                    v-if="addonBefore.includes('pi')"
+                    :class="addonBefore"
+                ></i>
+                <span v-else>{{ addonBefore }}</span>
+            </span>
+            <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
+            <span v-if="addonAfter" class="p-inputgroup-addon">
+                <i
+                    :data-testid="dataTestidIcon"
+                    v-if="addonAfter.includes('pi')"
+                    :class="addonAfter"
+                ></i>
+                <span v-else>{{ addonAfter }}</span>
+            </span>
+        </div>
 
-    <small
-        v-for="(error, index) in errors"
-        :key="index"
-        class="mt-[0.35rem] text-[84%] block text-[#e24c4c]"
-        :class="{ 'mb-2': index == errors.length - 1 }"
-        :id="errorElementId(index)"
-        :data-testid="`validation-error-${fieldKey || 'field'}`"
-    >
-        {{ error }}
-    </small>
+        <div v-else class="input-field-wrap" :class="fieldWrapperClass">
+            <RawField v-bind="$attrs" :id="id" :invalid="hasError" />
+        </div>
+
+        <small
+            v-for="(error, index) in errors"
+            :key="index"
+            class="mt-[0.35rem] text-[84%] block text-[#e24c4c]"
+            :class="{ 'mb-2': index == errors.length - 1 }"
+            :id="errorElementId(index)"
+            :data-testid="`validation-error-${fieldKey || 'field'}`"
+        >
+            {{ error }}
+        </small>
+    </div>
 </template>
 
 <style lang="scss" scoped>
+.input-field-root {
+    display: block;
+    width: 100%;
+
+    &:has(.p-checkbox),
+    &:has(.p-radiobutton),
+    &:has(.p-toggleswitch) {
+        width: auto;
+        flex: 0 0 auto;
+    }
+}
+
 $field-error-color: #e24c4c;
 
 .input-field-wrap--invalid {

@@ -20,6 +20,10 @@ export const update = (id, payload) => {
     return AxiosService.put(`${BASE_URL}/students/${id}`, payload);
 };
 
+export const show = (id) => {
+    return AxiosService.get(`${BASE_URL}/students/${id}`);
+};
+
 export const changeStatus = (id, payload) => {
     return AxiosService.post(
         `${BASE_URL}/students/${id}/change-status`,

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeMount, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { FilterMatchMode } from '@primevue/core/api';
 import Checkbox from 'primevue/checkbox';
 import RadioButton from 'primevue/radiobutton';
@@ -54,6 +55,7 @@ const FILTER_CB_WRAP_INACTIVE =
 function disableFutureEndDate(date) {
     return dayjs(date).startOf('day').isAfter(dayjs().startOf('day'));
 }
+const router = useRouter();
 const studentStore = useStudentStore();
 const globalStore = useGlobalStore();
 
@@ -64,7 +66,6 @@ const dialogRef = ref(null);
 const selectedItem = ref(null);
 const loading = ref(false);
 const items = ref([]);
-const isEditMode = ref(false);
 const busy = ref(false);
 const totalRecords = ref();
 const showDialog = ref(false);
@@ -324,14 +325,7 @@ const isItemActive = computed(() => {
 });
 
 const dialogHeader = computed(() => {
-    const base = isEditMode.value ? 'Edit Student' : 'New Student';
-    if (isEditMode.value) {
-        const id = selectedItem.value?.student_id;
-        if (id !== null && id !== undefined && id !== '') {
-            return `${base}, ID: ${id}`;
-        }
-        return base;
-    }
+    const base = 'New Student';
     const id = previewStudentId.value;
     if (id !== null && id !== undefined && id !== '') {
         return `${base}, ID: ${id}`;
@@ -348,15 +342,10 @@ const deactivateConfirmDisabled = computed(
     () => isItemActive.value && !deactivateEndDate.value
 );
 
-const openDialog = (mode = 'add') => {
-    isEditMode.value = mode === 'edit';
-    if (mode !== 'edit') {
-        resetForm();
-        assigningId.value = true;
-        loadNextStudentId();
-    } else {
-        previewStudentId.value = '';
-    }
+const openDialog = () => {
+    resetForm();
+    assigningId.value = true;
+    loadNextStudentId();
     showDialog.value = true;
 };
 
@@ -398,11 +387,7 @@ async function loadNextStudentId() {
     previewStudentId.value = '';
     try {
         const res = await studentStore.nextStudentId();
-        if (
-            token !== nextIdToken.value ||
-            !showDialog.value ||
-            isEditMode.value
-        ) {
+        if (token !== nextIdToken.value || !showDialog.value) {
             return;
         }
         previewStudentId.value = res?.data?.student_id ?? '';
@@ -453,19 +438,11 @@ const resetForm = () => {
 };
 
 const editItem = () => {
-    resetForm();
     const row = selectedItem.value;
-    formData.value.name = row.name;
-    formData.value.parent_1_mobile = row.parent_1_mobile ?? '';
-    formData.value.parent_2_mobile = row.parent_2_mobile ?? '';
-    formData.value.start_date = row.start_date ?? null;
-    formData.value.maths = !!row.maths;
-    formData.value.reading = !!row.reading;
-    formData.value.tuition_fee =
-        row.tuition_fee !== null && row.tuition_fee !== undefined
-            ? Number(row.tuition_fee)
-            : null;
-    openDialog('edit');
+    if (!row?.uuid) {
+        return;
+    }
+    router.push({ name: 'EditStudent', params: { uuid: row.uuid } });
 };
 
 const showActions = (event, item) => {
@@ -497,34 +474,22 @@ function buildPayload() {
             fee === null || fee === undefined || fee === '' ? null : Number(fee)
     };
 
-    if (!isEditMode.value) {
-        const cardUid = assignCardEnabled.value
-            ? trimCardUid(formData.value.card_uid)
-            : '';
-        payload.card_uid = cardUid === '' ? null : cardUid;
-    }
+    const cardUid = assignCardEnabled.value
+        ? trimCardUid(formData.value.card_uid)
+        : '';
+    payload.card_uid = cardUid === '' ? null : cardUid;
 
     return payload;
 }
 
 const save = async () => {
-    if (
-        !isEditMode.value &&
-        (!previewStudentId.value || !formData.value.start_date)
-    ) {
-        return;
-    }
-    if (isEditMode.value && !formData.value.start_date) {
+    if (!previewStudentId.value || !formData.value.start_date) {
         return;
     }
     try {
         busy.value = true;
         const payload = buildPayload();
-        if (isEditMode.value) {
-            await studentStore.update(selectedItem.value.uuid, payload);
-        } else {
-            await studentStore.create(payload);
-        }
+        await studentStore.create(payload);
         closeDialog();
         await Promise.all([getItems(), refreshStatusCounts()]);
         selectedItem.value = null;
@@ -568,10 +533,9 @@ const changeStatus = async () => {
     try {
         loading.value = true;
         if (selectedItem.value) {
-            const payload =
-                isItemActive.value && deactivateEndDate.value
-                    ? { end_date: deactivateEndDate.value }
-                    : undefined;
+            const payload = isItemActive.value
+                ? { end_date: deactivateEndDate.value }
+                : { end_date: null };
             await studentStore.changeStatus(selectedItem.value.uuid, payload);
         }
         changeStatusDialog.value = false;
@@ -781,7 +745,7 @@ const changeStatus = async () => {
                     label="Add New"
                     icon="pi pi-plus"
                     class="shrink-0"
-                    @click="openDialog('add')"
+                    @click="openDialog()"
                 />
             </div>
         </div>
@@ -1053,26 +1017,20 @@ const changeStatus = async () => {
     </Card>
 
     <BaseDialog
-        v-if="
-            $ability.can('core.students.edit') ||
-            $ability.can('core.students.create')
-        "
+        v-if="$ability.can('core.students.create')"
         ref="dialogRef"
         v-model:visible="showDialog"
         @update:visible="onShow"
         :busy="busy"
-        :isEditMode="isEditMode"
+        :isEditMode="false"
         :header="dialogHeader"
-        :confirmLabel="isEditMode ? 'Update Student' : 'Create Student'"
+        confirmLabel="Create Student"
         :formData="formData"
-        :initialData="isEditMode ? selectedItem : null"
         :enableDirtyCheck="true"
         :hideCancelButton="true"
         :confirmBeforeSave="false"
         :disableConfirm="
-            assigningId ||
-            !formData.start_date ||
-            (!isEditMode && !previewStudentId)
+            assigningId || !formData.start_date || !previewStudentId
         "
         @cancel="closeDialog"
         @confirm="save"
@@ -1200,7 +1158,7 @@ const changeStatus = async () => {
             </div>
 
             <div
-                v-if="!isEditMode && !assignCardFlowStarted"
+                v-if="!assignCardFlowStarted"
                 class="col-span-12 mt-3 flex justify-center"
             >
                 <Button
@@ -1212,10 +1170,7 @@ const changeStatus = async () => {
                 />
             </div>
 
-            <div
-                v-if="!isEditMode && assignCardFlowStarted"
-                class="col-span-12 mt-3"
-            >
+            <div v-if="assignCardFlowStarted" class="col-span-12 mt-3">
                 <label class="block mb-2" for="assign_card_switch">
                     Assign Card
                 </label>
@@ -1230,7 +1185,7 @@ const changeStatus = async () => {
             </div>
 
             <CardScanner
-                v-if="!isEditMode && assignCardEnabled"
+                v-if="assignCardEnabled"
                 :captured-uid="formData.card_uid"
                 :busy="busy"
                 :error="cardUidError"

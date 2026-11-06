@@ -41,6 +41,13 @@ export const useStudentStore = defineStore('StudentStore', () => {
         });
     };
 
+    const show = (id) => {
+        return globalStore.actionWrapper(async () => {
+            const res = await StudentService.show(id);
+            return res.data;
+        });
+    };
+
     const updateCardUid = (id, cardUid, { isReplace = false } = {}) => {
         return globalStore.actionWrapper(async () => {
             const res = await StudentService.update(id, { card_uid: cardUid });
@@ -81,6 +88,7 @@ export const useStudentStore = defineStore('StudentStore', () => {
         search,
         create,
         update,
+        show,
         updateCardUid,
         changeStatus,
         deleteItem
