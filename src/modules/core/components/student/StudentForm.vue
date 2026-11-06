@@ -624,12 +624,7 @@ function goBackFromNotFound() {
                                 >Card number</span
                             >
                             <span
-                                class="student-card-schedule-panel__value block font-mono"
-                                :class="{
-                                    'text-primary':
-                                        hasSavedCard &&
-                                        cardNumberPanelValue !== '-'
-                                }"
+                                class="student-card-schedule-panel__value block"
                                 >{{ cardNumberPanelValue }}</span
                             >
                         </div>
